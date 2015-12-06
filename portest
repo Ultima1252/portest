@@ -1,0 +1,257 @@
+#!/bin/sh
+# Copyright (c) 2015, Ricky Gallamore
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# The views and conclusions contained in the software and documentation are those
+# of the authors and should not be interpreted as representing official policies,
+# either expressed or implied, of the FreeBSD Project.
+
+PORTEST_VERSION="0.0.3"
+
+usage() {
+	cat << EOF
+Usage: portest [-f bulkfile] [-j "jail1 jail2"] [-abpPrRtTv] file.diff file2.diff ...
+
+Options:
+    -a     --  Do everything except revert (-ptf build.ports.txt)
+    -b     --  Generate the list of cat/ports based on port tree
+               instead of diff, slow
+    -f     --  Generate a poudiere usable bulk file
+    -j     --  Jails used for poudriere, if multiple are used
+               must be in "" with a space as a seperator
+               overrides conf, only used with -T option
+    -p     --  Patch, will exit on fail with output
+    -P     --  Patch, do not exit on failed patch
+    -r     --  Revert the files listed in patchfile, fast and
+               should be all thats required
+    -R     --  Revert modifications according tree, slow but
+               will guarantee tree integrity
+    -t     --  Test with portlint
+    -T     --  Test with port test, or poudriere depending on
+               USE_POUDRIERE
+    -v     --  Show version of portest
+
+By default, (no options) portest does nothing
+EOF
+	exit 1
+}
+
+while getopts ":abj:f:pPrRtTv" FLAG; do
+	case "${FLAG}" in
+	a)
+		ALL="YES"
+		;;
+	b)
+		SVN_BUILD_LIST="YES"
+		;;
+	j)
+		POUDRIERE_JAILS="${OPTARG}"
+		;;
+	f)
+		POUDRIERE_BULK="YES"
+		POUDRIERE_BULK_FILE="${OPTARG}"
+		;;
+	p)
+		PATCH="YES"
+		;;
+	P)
+		PATCH_FAILED_EXIT="NO"
+		;;
+	r)
+		REVERT_SOFT="YES"
+		;;
+	R)
+		REVERT_HARD="YES"
+		;;
+	t)
+		TEST_PORTLINT="YES"
+		;;
+	T)
+		TEST_BUILD="YES"
+		;;
+	v)
+		echo "${PORTEST_VERSION}"
+		exit 0
+	esac
+done
+
+shift "$((OPTIND-1))"
+
+[ $# -lt 1 ] && usage 
+
+
+SVN="svnlite"
+SVN_PATCH_ARGS="patch"
+SVN_REVERT_ARGS="revert -R"
+PORTLINT="portlint"
+PORTLINT_ARGS="-A"
+PORT="port"
+PORT_ARGS="test"
+PORTSDIR="/usr/ports"
+BULK_FILE="build.ports.txt"
+
+USE_POUDRIERE="YES"
+[ -z "${POUDRIERE_JAILS}" ] && POUDRIERE_JAILS="102amd64 102i386 93amd64 93i386"
+POUDRIERE_PORTSDIR="/usr/local/poudriere/ports"
+POUDRIERE_PORT="test"
+POUDRIERE="poudriere"
+POUDRIERE_ARGS="bulk -t -C -p ${POUDRIERE_PORT}"
+
+# Set poudriere ports dir if being used #
+if [ "${USE_POUDRIERE}" == "YES" ]; then
+PORTSDIR="${POUDRIERE_PORTSDIR}/${POUDRIERE_PORT}"
+fi
+
+
+CURDIR="`pwd`"
+
+# Check PORTSDIR #
+! [ -d "${PORTSDIR}" ] && echo "PORTSDIR not set or incorrect directory" && exit 1
+
+if [ "head/Makefile" != "`head -1 "${PORTSDIR}/Makefile" | grep -o head/Makefile`" ]; then
+	echo "PORTSDIR is set to an incorrect directory"
+	exit 1
+fi
+
+# Check PORTSDIR is an svn tree #
+cd ${PORTSDIR}
+${SVN} info >/dev/null 2>&1
+[ $? -ne 0 ] && echo "PORTSDIR is not an svn tree" && exit 1
+
+# Set patchfile path #
+cd "${PORTSDIR}"
+for file in "${@}"; do
+	if [ -f "$file" ]; then
+		PATCH_FILE="${PATCH_FILE} $file"
+	elif [ -f "${CURDIR}/$file" ]; then
+		PATCH_FILE="${PATCH_FILE} ${CURDIR}/$file"
+	else
+		echo "$file not found"
+		exit 1
+	fi
+done
+
+# Check for valid jails #
+if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" == "YES" ]; then
+	for jail in ${POUDRIERE_JAILS}; do
+	${POUDRIERE} jail -i -j $jail >/dev/null 2>&1
+	[ $? -ne 0 ] && echo "No such jail $jail" && exit 1
+	done
+fi
+
+### Patch Tree ###
+if [ "${PATCH}" == "YES" ] || [ "${PATCH_FAILED_EXIT}" == "NO" ] || [ "${ALL}" == "YES" ]; then
+	for file in ${PATCH_FILE}; do
+		SVN_OUTPUT="${SVN_OUTPUT}
+"`${SVN} ${SVN_PATCH_ARGS} "$file"`
+		done
+	if [ $? -ne 0 ] && [ "${PATCH_FAILED_EXIT}" != "NO" ] || [ "`echo "${SVN_OUTPUT}" | grep -m 1 -o rejected`" == "rejected" ] && [ "${PATCH_FAILED_EXIT}" != "NO" ]; then
+		for file in `echo "${SVN_OUTPUT}" | grep -B 1 "rejected" | grep -v ">" | awk '{ print $2 }'`; do
+			echo "${SVN_OUTPUT}" | grep -A 1 "$file"
+			cat "${PORTSDIR}/$file.svnpatch.rej"
+		done
+		echo "${SVN_OUTPUT}"
+		echo "Patch Failed"
+		exit 1
+	else
+		for file in `echo "${SVN_OUTPUT}" | grep -B 1 "rejected" | grep -v ">" | awk '{ print $2 }'`; do
+			echo "${SVN_OUTPUT}" | grep -A 1 "$file"
+			cat "${PORTSDIR}/$file.svnpatch.rej"
+		done
+		echo "${SVN_OUTPUT}"
+	fi
+fi
+
+# Generate a list of ports for poudriere to build #
+buildlist() {
+
+if [ "${SVN_BUILD_LIST}" == "YES" ]; then
+cd ${PORTSDIR}
+BUILD_LIST="`(${SVN} status | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
+else
+BUILD_LIST="`(cat ${PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
+fi
+
+}
+
+### Bulk File ###
+cd ${CURDIR}
+if [ "$POUDRIERE_BULK" == "YES" ]; then
+	[ -z "${BUILD_LIST}" ] && buildlist
+	echo "${BUILD_LIST}" >"${POUDRIERE_BULK_FILE}"
+elif [ "${ALL}" == "YES" ]; then
+	[ -z "${BUILD_LIST}" ] && buildlist
+	echo "${BUILD_LIST}" >"${BULK_FILE}"
+fi
+
+### Portlint ###
+if [ "${TEST_PORTLINT}" == "YES" ] || [ "${ALL}" == "YES" ]; then
+	[ -z "${BUILD_LIST}" ] && buildlist
+	for port in ${BUILD_LIST}; do
+		cd "${PORTSDIR}/$port"
+		echo "$port"
+		${PORTLINT} ${PORTLINT_ARGS}
+	done
+fi
+
+
+### Port test and Poudriere testing ###
+if [ "${TEST_BUILD}" == "YES" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
+	rm -rf "`find ${PORTSDIR} -type directory -name "work" -maxdepth 3`"
+	[ -z "${BUILD_LIST}" ] && buildlist
+	for port in ${BUILD_LIST}; do
+		cd "${PORTSDIR}/$port"
+		make depends BATCH=yes
+		${PORT} ${PORT_ARGS}
+	done
+elif [ "${TEST_BUILD}" == "YES" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
+	[ -z "${BUILD_LIST}" ] && buildlist
+	for jail in ${POUDRIERE_JAILS}; do
+		${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
+	done
+fi
+
+### Revert Patch ###
+cd ${PORTSDIR}
+if [ "${REVERT_SOFT}" == "YES" ] && [ "${REVERT_HARD}" != "YES" ]; then
+	[ -z "${BUILD_LIST}" ] && buildlist
+# Generate a list of files that were patched #
+	PATCH_FILES_LIST="`cat ${PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $2 }' | sort`"
+# Wierd cases where svn won't see short filenames in list.    #
+# This seems to be an svn bug, this list helps in those cases #
+	PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[a-z].*\/.*\/.*'`"
+	for file in ${BUILD_LIST}; do
+		rm -rf "${PORTSDIR}/$file"
+	done
+	for file in ${PATCH_FILES_LIST}; do
+		rm -rf "${PORTSDIR}/$file"
+	done
+	${SVN} ${SVN_REVERT_ARGS} ${BUILD_LIST}
+	${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
+	[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
+elif [ "${REVERT_HARD}"  == "YES" ]; then
+	for file in `${SVN} status | awk '{ print $2 }'`; do
+		rm -rf "${PORTSDIR}/$file"
+	done
+	${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
+fi
