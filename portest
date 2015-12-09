@@ -113,7 +113,7 @@ BULK_FILE="build.ports.txt"
 USE_POUDRIERE="YES"
 [ -z "${POUDRIERE_JAILS}" ] && POUDRIERE_JAILS="102amd64 102i386 93amd64 93i386"
 POUDRIERE_PORTSDIR="/usr/local/poudriere/ports"
-POUDRIERE_PORT="test"
+POUDRIERE_PORT="default"
 POUDRIERE="poudriere"
 POUDRIERE_ARGS="bulk -t -C -p ${POUDRIERE_PORT}"
 
