@@ -26,7 +26,7 @@
 # of the authors and should not be interpreted as representing official policies,
 # either expressed or implied, of the FreeBSD Project.
 
-PORTEST_VERSION="0.0.3"
+PORTEST_VERSION="0.0.4"
 
 usage() {
 	cat << EOF
@@ -99,29 +99,28 @@ shift "$((OPTIND-1))"
 
 [ $# -lt 1 ] && usage 
 
+: ${SVN:="svnlite"}
+: ${SVN_PATCH_ARGS:="patch"}
+: ${SVN_REVERT_ARGS:="revert -R"}
+: ${PORTLINT:="portlint"}
+: ${PORTLINT_ARGS:="-A"}
+: ${PORT:="port"}
+: ${PORT_ARGS:="test"}
+: ${PORTSDIR:="/usr/ports"}
+: ${BULK_FILE:="build.ports.txt"}
 
-SVN="svnlite"
-SVN_PATCH_ARGS="patch"
-SVN_REVERT_ARGS="revert -R"
-PORTLINT="portlint"
-PORTLINT_ARGS="-A"
-PORT="port"
-PORT_ARGS="test"
-PORTSDIR="/usr/ports"
-BULK_FILE="build.ports.txt"
 
-USE_POUDRIERE="YES"
-[ -z "${POUDRIERE_JAILS}" ] && POUDRIERE_JAILS="102amd64 102i386 93amd64 93i386"
-POUDRIERE_PORTSDIR="/usr/local/poudriere/ports"
-POUDRIERE_PORT="default"
+: ${USE_POUDRIERE:="YES"}
+[ -z "${POUDRIERE_JAILS}" ] && : ${POUDRIERE_JAILS:="102amd64 102i386 93amd64 93i386"}
+: ${POUDRIERE_PORTSDIR:="/usr/local/poudriere/ports"}
+: ${POUDRIERE_PORT:="default"}
 POUDRIERE="poudriere"
-POUDRIERE_ARGS="bulk -t -C -p ${POUDRIERE_PORT}"
+: ${POUDRIERE_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
 
 # Set poudriere ports dir if being used #
 if [ "${USE_POUDRIERE}" == "YES" ]; then
 PORTSDIR="${POUDRIERE_PORTSDIR}/${POUDRIERE_PORT}"
 fi
-
 
 CURDIR="`pwd`"
 
