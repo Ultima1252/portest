@@ -127,7 +127,7 @@ CURDIR="`pwd`"
 # Check PORTSDIR #
 ! [ -d "${PORTSDIR}" ] && echo "PORTSDIR not set or incorrect directory" && exit 1
 
-if [ "head/Makefile" != "`head -1 "${PORTSDIR}/Makefile" | grep -o head/Makefile`" ]; then
+if [ "FreeBSD Ports Collection" != "`head -1 "${PORTSDIR}/README" | grep -o \"FreeBSD Ports Collection\"`" ]; then
 	echo "PORTSDIR is set to an incorrect directory"
 	exit 1
 fi
