@@ -135,7 +135,13 @@ fi
 # Check PORTSDIR is an svn tree #
 cd ${PORTSDIR}
 ${SVN} info >/dev/null 2>&1
-[ $? -ne 0 ] && echo "PORTSDIR is not an svn tree" && exit 1
+if [ $? -eq 0 ]; then
+	REPO_TYPE="svn"
+else
+	git show >/dev/null 2>&1
+	[ $? -ne 0] && echo "PORTSDIR is not an svn or git tree" && exit 1
+	REPO_TYPE="git"
+fi
 
 # Set patchfile path #
 cd "${PORTSDIR}"
