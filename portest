@@ -102,9 +102,11 @@ shift "$((OPTIND-1))"
 : ${SVN:="svnlite"}
 : ${SVN_PATCH_ARGS:="patch"}
 : ${SVN_REVERT_ARGS:="revert -R"}
+: ${SVN_STATUS_ARGS=:"status"}
 : ${GIT:="git"}
 : ${GIT_CLEAN_ARGS:="clean -Xfd -f"}
 : ${GIT_RESET_ARGS:="reset --hard"}
+: ${GIT_STATUS_ARGS:="status -s"}
 : ${PORTLINT:="portlint"}
 : ${PORTLINT_ARGS:="-A"}
 : ${PORT:="port"}
@@ -141,11 +143,13 @@ ${SVN} info >/dev/null 2>&1
 if [ $? -eq 0 ]; then
 	REPO_TYPE="svn"
 	REPO="${SVN}"
+	REPO_STATUS="${SVN_STATUS_ARGS}"
 else
 	git show >/dev/null 2>&1
 	[ $? -ne 0] && echo "PORTSDIR is not an svn or git tree" && exit 1
 	REPO_TYPE="git"
 	REPO="${GIT}"
+	REPO_STATUS="${GIT_STATUS_ARGS}"
 fi
 
 # Set patchfile path #
@@ -210,7 +214,7 @@ buildlist() {
 
 if [ "${SVN_BUILD_LIST}" == "YES" ]; then
 cd ${PORTSDIR}
-BUILD_LIST="`(${REPO} status | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
+BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
 else
 BUILD_LIST="`(cat ${PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
 fi
