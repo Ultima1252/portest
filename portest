@@ -26,7 +26,7 @@
 # of the authors and should not be interpreted as representing official policies,
 # either expressed or implied, of the FreeBSD Project.
 
-PORTEST_VERSION="0.0.4"
+PORTEST_VERSION="0.0.5"
 
 usage() {
 	cat << EOF
@@ -72,7 +72,7 @@ while getopts ":abj:f:pPrRtTv" FLAG; do
 		POUDRIERE_BULK_FILE="${OPTARG}"
 		;;
 	p)
-		PATCH="YES"
+		DO_PATCH="YES"
 		;;
 	P)
 		PATCH_FAILED_EXIT="NO"
@@ -99,10 +99,12 @@ shift "$((OPTIND-1))"
 
 [ $# -lt 1 ] && usage 
 
+: ${PATCH:="patch"}
+: ${PATCH_SVN_ARGS:="-Esf"}
+: ${PATCH_GIT_ARGS:="-Esfp1"}
 : ${SVN:="svnlite"}
-: ${SVN_PATCH_ARGS:="patch"}
 : ${SVN_REVERT_ARGS:="revert -R"}
-: ${SVN_STATUS_ARGS=:"status"}
+: ${SVN_STATUS_ARGS:="status"}
 : ${GIT:="git"}
 : ${GIT_CLEAN_ARGS:="clean -Xfd -f"}
 : ${GIT_RESET_ARGS:="reset --hard"}
@@ -116,7 +118,7 @@ shift "$((OPTIND-1))"
 
 
 : ${USE_POUDRIERE:="YES"}
-[ -z "${POUDRIERE_JAILS}" ] && : ${POUDRIERE_JAILS:="102amd64 102i386 93amd64 93i386"}
+[ -z "${POUDRIERE_JAILS}" ] && : ${POUDRIERE_JAILS:=""}
 : ${POUDRIERE_PORTSDIR:="/usr/local/poudriere/ports"}
 : ${POUDRIERE_PORT:="default"}
 POUDRIERE="poudriere"
@@ -137,16 +139,19 @@ if [ "FreeBSD Ports Collection" != "`head -1 "${PORTSDIR}/README" | grep -o \"Fr
 	exit 1
 fi
 
-# Check PORTSDIR is an svn tree #
+# Check PORTSDIR is an svn or git tree #
 cd ${PORTSDIR}
 ${SVN} info >/dev/null 2>&1
-if [ $? -eq 0 ]; then
+if [ "$?" -eq "0" ]; then
 	REPO_TYPE="svn"
 	REPO="${SVN}"
 	REPO_STATUS="${SVN_STATUS_ARGS}"
 else
-	git show >/dev/null 2>&1
-	[ $? -ne 0] && echo "PORTSDIR is not an svn or git tree" && exit 1
+	${GIT} branch >/dev/null 2>&1
+		if [ "$?" -ne "0" ]; then
+		echo "PORTSDIR is not an svn or git tree"
+		exit 1
+		fi
 	REPO_TYPE="git"
 	REPO="${GIT}"
 	REPO_STATUS="${GIT_STATUS_ARGS}"
@@ -165,8 +170,20 @@ for file in "${@}"; do
 	fi
 done
 
+for file in ${PATCH_FILE}; do
+	if [ "Index:" == "`head -4 \"$file\" | grep -m 1 -o \"^Index:\"`" ]; then
+		SVN_PATCH_FILE="${SVN_PATCH_FILE} $file"
+	elif [ "diff --git" == "`head -4 \"$file\" | grep -m 1 -o \"^diff \-\-git\"`" ]; then
+		GIT_PATCH_FILE="${GIT_PATCH_FILE} $file"
+	else
+		echo "$file is not a svn or git patchfile"
+		exit 1
+	fi
+done
+
 # Check for valid jails #
 if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" == "YES" ]; then
+	[ -z "${POUDRIERE_JAILS}" ] && echo "no jails selected use -j or export POUDRIERE_JAILS=\"jail1 jail2\""
 	for jail in ${POUDRIERE_JAILS}; do
 	${POUDRIERE} jail -i -j $jail >/dev/null 2>&1
 	[ $? -ne 0 ] && echo "No such jail $jail" && exit 1
@@ -174,39 +191,31 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" == "YES" ]; then
 fi
 
 ### Patch Tree ###
-if [ "${PATCH}" == "YES" ] || [ "${PATCH_FAILED_EXIT}" == "NO" ] || [ "${ALL}" == "YES" ]; then
-case ${REPO_TYPE} in
-	svn)
-	for file in ${PATCH_FILE}; do
-		SVN_OUTPUT="${SVN_OUTPUT}
-"`${SVN} ${SVN_PATCH_ARGS} "$file"`
-		done
-		for file in `echo "${SVN_OUTPUT}" | grep -B 1 "rejected" | grep -v ">" | awk '{ print $2 }'`; do
-			echo "${SVN_OUTPUT}" | grep -A 1 "$file"
-			cat "${PORTSDIR}/$file.svnpatch.rej"
-		done
-		echo "${SVN_OUTPUT}"
-	if [ "`echo "${SVN_OUTPUT}" | grep -m 1 -o rejected`" == "rejected" ] && [ "${PATCH_FAILED_EXIT}" != "NO" ]; then
-		echo "Patch Failed"
-		exit 1
-	fi
-	;;
-	git)
-	for file in ${PATCH_FILE}; do
+if [ "${DO_PATCH}" == "YES" ] || [ "${PATCH_FAILED_EXIT}" == "NO" ] || [ "${ALL}" == "YES" ]; then
+	for file in ${SVN_PATCH_FILE}; do
 	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`patch -sfd "${PORTSDIR}" -i "$file"`
+"`${PATCH} ${PATCH_SVN_ARGS} -d "${PORTSDIR}" -i "$file"`
+	done
+	for file in ${GIT_PATCH_FILE}; do
+	PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${PATCH} ${PATCH_GIT_ARGS} -d "${PORTSDIR}" -i "$file"`
 	done
 		for file in `echo "${PATCH_OUTPUT}" | awk '{print $(NF)}'`; do
 			echo "$file"
 			cat "${PORTSDIR}/$file"
 		done
-		echo "${PATCH_OUTPUT}"
+		
 	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ] && [ "${PATCH_FAILED_EXIT}" != "NO" ]; then
+		echo "${PATCH_OUTPUT}"
 		echo "Patch Failed"
 		exit 1
+	else
+		if [ "svn" == "${REPO_TYPE}" ]; then
+			rm `find ${PORTSDIR} -name "*.orig" -maxdepth 4` >/dev/null
+		elif [ "git" == "${REPO_TYPE}" ]; then
+			${GIT} ${GIT_CLEAN_ARGS} >/dev/null
+		fi
 	fi
-	;;
-esac
 fi
 
 # Generate a list of ports for poudriere to build #
@@ -216,18 +225,21 @@ if [ "${SVN_BUILD_LIST}" == "YES" ]; then
 cd ${PORTSDIR}
 BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
 else
-BUILD_LIST="`(cat ${PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
+[ -n "${SVN_PATCH_FILE}" ] && BUILD_LIST="`(cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//')`"
+[ -n "${GIT_PATCH_FILE}" ] && BUILD_LIST="${BUILD_LIST}
+"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\/// ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//'`
+BUILD_LIST="`echo "${BUILD_LIST}" | sort | awk '!a[$0]++'`"
 fi
-
 }
 
 ### Bulk File ###
-cd ${CURDIR}
 if [ "$POUDRIERE_BULK" == "YES" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
+	cd "${CURDIR}"
 	echo "${BUILD_LIST}" >"${POUDRIERE_BULK_FILE}"
 elif [ "${ALL}" == "YES" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
+	cd "${CURDIR}"
 	echo "${BUILD_LIST}" >"${BULK_FILE}"
 fi
 
@@ -265,7 +277,9 @@ case ${REPO_TYPE} in
 if [ "${REVERT_SOFT}" == "YES" ] && [ "${REVERT_HARD}" != "YES" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 # Generate a list of files that were patched #
-	PATCH_FILES_LIST="`cat ${PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $2 }' | sort`"
+	[ -n "${SVN_PATCH_FILE}" ] && PATCH_FILES_LIST="`cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $2 }'`"
+	[ -n "${GIT_PATCH_FILE}" ] && PATCH_FILES_LIST="${PATCH_FILES_LIST}
+"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\///'`
 # Wierd cases where svn won't see short filenames in list.    #
 # This seems to be an svn bug, this list helps in those cases #
 	PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[a-z].*\/.*\/.*'`"
