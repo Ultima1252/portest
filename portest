@@ -102,6 +102,9 @@ shift "$((OPTIND-1))"
 : ${SVN:="svnlite"}
 : ${SVN_PATCH_ARGS:="patch"}
 : ${SVN_REVERT_ARGS:="revert -R"}
+: ${GIT:="git"}
+: ${GIT_CLEAN_ARGS:="clean -Xfd -f"}
+: ${GIT_RESET_ARGS:="reset --hard"}
 : ${PORTLINT:="portlint"}
 : ${PORTLINT_ARGS:="-A"}
 : ${PORT:="port"}
@@ -137,10 +140,12 @@ cd ${PORTSDIR}
 ${SVN} info >/dev/null 2>&1
 if [ $? -eq 0 ]; then
 	REPO_TYPE="svn"
+	REPO="${SVN}"
 else
 	git show >/dev/null 2>&1
 	[ $? -ne 0] && echo "PORTSDIR is not an svn or git tree" && exit 1
 	REPO_TYPE="git"
+	REPO="${GIT}"
 fi
 
 # Set patchfile path #
@@ -166,25 +171,38 @@ fi
 
 ### Patch Tree ###
 if [ "${PATCH}" == "YES" ] || [ "${PATCH_FAILED_EXIT}" == "NO" ] || [ "${ALL}" == "YES" ]; then
+case ${REPO_TYPE} in
+	svn)
 	for file in ${PATCH_FILE}; do
 		SVN_OUTPUT="${SVN_OUTPUT}
 "`${SVN} ${SVN_PATCH_ARGS} "$file"`
 		done
-	if [ $? -ne 0 ] && [ "${PATCH_FAILED_EXIT}" != "NO" ] || [ "`echo "${SVN_OUTPUT}" | grep -m 1 -o rejected`" == "rejected" ] && [ "${PATCH_FAILED_EXIT}" != "NO" ]; then
 		for file in `echo "${SVN_OUTPUT}" | grep -B 1 "rejected" | grep -v ">" | awk '{ print $2 }'`; do
 			echo "${SVN_OUTPUT}" | grep -A 1 "$file"
 			cat "${PORTSDIR}/$file.svnpatch.rej"
 		done
 		echo "${SVN_OUTPUT}"
+	if [ "`echo "${SVN_OUTPUT}" | grep -m 1 -o rejected`" == "rejected" ] && [ "${PATCH_FAILED_EXIT}" != "NO" ]; then
 		echo "Patch Failed"
 		exit 1
-	else
-		for file in `echo "${SVN_OUTPUT}" | grep -B 1 "rejected" | grep -v ">" | awk '{ print $2 }'`; do
-			echo "${SVN_OUTPUT}" | grep -A 1 "$file"
-			cat "${PORTSDIR}/$file.svnpatch.rej"
-		done
-		echo "${SVN_OUTPUT}"
 	fi
+	;;
+	git)
+	for file in ${PATCH_FILE}; do
+	PATCH_OUTPUT="${PATCH_OUTPUT}
+"`patch -sfd "${PORTSDIR}" -i "$file"`
+	done
+		for file in `echo "${PATCH_OUTPUT}" | awk '{print $(NF)}'`; do
+			echo "$file"
+			cat "${PORTSDIR}/$file"
+		done
+		echo "${PATCH_OUTPUT}"
+	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ] && [ "${PATCH_FAILED_EXIT}" != "NO" ]; then
+		echo "Patch Failed"
+		exit 1
+	fi
+	;;
+esac
 fi
 
 # Generate a list of ports for poudriere to build #
@@ -192,7 +210,7 @@ buildlist() {
 
 if [ "${SVN_BUILD_LIST}" == "YES" ]; then
 cd ${PORTSDIR}
-BUILD_LIST="`(${SVN} status | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
+BUILD_LIST="`(${REPO} status | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
 else
 BUILD_LIST="`(cat ${PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
 fi
@@ -238,6 +256,8 @@ fi
 
 ### Revert Patch ###
 cd ${PORTSDIR}
+case ${REPO_TYPE} in
+	svn)
 if [ "${REVERT_SOFT}" == "YES" ] && [ "${REVERT_HARD}" != "YES" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 # Generate a list of files that were patched #
@@ -260,3 +280,11 @@ elif [ "${REVERT_HARD}"  == "YES" ]; then
 	done
 	${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
 fi
+	;;
+	git)
+if [ "${REVERT_SOFT}" == "YES" ] || [ "${REVERT_HARD}" == "YES" ]; then
+	${GIT} ${GIT_CLEAN_ARGS}
+	${GIT} ${GIT_RESET_ARGS}
+fi
+	;;
+esac
