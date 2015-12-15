@@ -62,7 +62,7 @@ while getopts ":abj:f:pPrRtTv" FLAG; do
 		ALL="YES"
 		;;
 	b)
-		SVN_BUILD_LIST="YES"
+		REPO_BUILD_LIST="YES"
 		;;
 	j)
 		POUDRIERE_JAILS="${OPTARG}"
@@ -234,7 +234,7 @@ fi
 # Generate a list of ports for poudriere to build #
 buildlist() {
 
-if [ "${SVN_BUILD_LIST}" == "YES" ]; then
+if [ "${REPO_BUILD_LIST}" == "YES" ]; then
 cd ${PORTSDIR}
 BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
 else
