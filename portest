@@ -141,22 +141,33 @@ if [ "FreeBSD Ports Collection" != "`head -1 "${PORTSDIR}/README" | grep -o \"Fr
 	exit 1
 fi
 
+# Check for commands #
+${SVN} help >/dev/null 2>&1
+if [ "$?" -ne "0" ]; then
+        SVN_CHECK="NO"
+fi
+${GIT} help >/dev/null 2>&1
+if [ "$?" -ne "0" ]; then
+        GIT_CHECK="NO"
+fi
+
 # Check PORTSDIR is an svn or git tree #
 cd ${PORTSDIR}
-${SVN} info >/dev/null 2>&1
-if [ "$?" -eq "0" ]; then
-	REPO_TYPE="svn"
-	REPO="${SVN}"
-	REPO_STATUS="${SVN_STATUS_ARGS}"
-else
-	${GIT} branch >/dev/null 2>&1
-		if [ "$?" -ne "0" ]; then
-		echo "PORTSDIR is not an svn or git tree"
-		exit 1
-		fi
-	REPO_TYPE="git"
-	REPO="${GIT}"
-	REPO_STATUS="${GIT_STATUS_ARGS}"
+if [ "${SVN_CHECK}" != "NO" ]; then
+        ${SVN} info >/dev/null 2>&1
+        if [ "$?" -eq "0" ]; then
+                REPO_TYPE="svn"
+                REPO="${SVN}"
+                REPO_STATUS="${SVN_STATUS_ARGS}"
+        fi
+fi
+if [ "${GIT_CHECK}" != "NO" ]; then
+        ${GIT} branch >/dev/null 2>&1
+        if [ "$?" -eq "0" ]; then
+                REPO_TYPE="git"
+                REPO="${GIT}"
+                REPO_STATUS="${GIT_STATUS_ARGS}"
+        fi
 fi
 
 # Set patchfile path #
