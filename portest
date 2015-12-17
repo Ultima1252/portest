@@ -49,6 +49,7 @@ Options:
     -t     --  Test with portlint
     -T     --  Test with port test, or poudriere depending on
                USE_POUDRIERE
+    -u     --  Update repo
     -v     --  Show version of portest
 
 By default, (no options) portest does nothing
@@ -56,7 +57,7 @@ EOF
 	exit 1
 }
 
-while getopts ":abj:f:pPrRtTv" FLAG; do
+while getopts ":abj:f:pPrRtTuv" FLAG; do
 	case "${FLAG}" in
 	a)
 		ALL="YES"
@@ -89,6 +90,9 @@ while getopts ":abj:f:pPrRtTv" FLAG; do
 	T)
 		TEST_BUILD="YES"
 		;;
+	u)
+		UPDATE_REPO="YES"
+		;;
 	v)
 		echo "${PORTEST_VERSION}"
 		exit 0
@@ -105,10 +109,14 @@ shift "$((OPTIND-1))"
 : ${SVN:="svnlite"}
 : ${SVN_REVERT_ARGS:="revert -R"}
 : ${SVN_STATUS_ARGS:="status"}
+: ${SVN_UPDATE_ARGS:="update"}
 : ${GIT:="git"}
 : ${GIT_CLEAN_ARGS:="clean -Xfd -f"}
 : ${GIT_RESET_ARGS:="reset --hard"}
 : ${GIT_STATUS_ARGS:="status -s"}
+: ${GIT_UPDATE_ARGS:="pull"}
+: ${GIT_STASH_ARGS:="stash"}
+: ${GIT_STASHPOP_ARGS:="stash pop"}
 : ${RM:="rm"}
 : ${RM_ARGS:="-rf"}
 : ${PORTLINT:="portlint"}
@@ -204,6 +212,21 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" == "YES" ]; then
 	${POUDRIERE} jail -i -j $jail >/dev/null 2>&1
 	[ $? -ne 0 ] && echo "No such jail $jail" && exit 1
 	done
+fi
+
+### Update Repo ###
+if [ "${UPDATE_REPO}" == "YES" ]; then
+cd ${PORTSDIR}
+	case ${REPO_TYPE} in
+		svn)
+			${SVN} ${SVN_UPDATE_ARGS}
+		;;
+		git)
+			${GIT} ${GIT_STASH_ARGS}
+			${GIT} ${GIT_UPDATE_ARGS}
+			${GIT} ${GIT_STASHPOP_ARGS}
+		;;
+	esac
 fi
 
 ### Patch Tree ###
