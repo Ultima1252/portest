@@ -31,15 +31,18 @@ PORTEST_VERSION="0.0.5"
 usage() {
 	cat << EOF
 Usage: portest [-f bulkfile] [-j "jail1 jail2"] [-abpPrRtTv] file.diff file2.diff ...
-       portest [-m git,svn] [-c] /usr/ports
+       portest [-m git] [-c] /new/repo/path
 
 Parameters:
     -a     --  Do everything except revert and port test (-ptf build.ports.txt)
+    -c     --  Create repo then exits, this option supersedes all
+               other options if USE_POUDRIERE is enabled, will
+               create a poudriere port to use
     -f     --  Generate a poudiere usable bulk file
     -p     --  Patch, will exit on fail with output
     -P     --  Patch, do not exit on failed patch
     -r     --  Revert the files listed in patchfile, fast
-    -R     --  Revert modifications according tree, slow but will
+    -R     --  Revert modifications according tree, slow but will 
                guarantee tree integrity (git always uses this method)
     -t     --  Test with portlint
     -T     --  Test with port test, or poudriere depending on
@@ -52,13 +55,16 @@ Options:
     -j     --  Jails used for poudriere, if multiple are used
                must be in "" with a space as a seperator
                overrides conf, only used with -T option
+    -m     --  Repo method, only used with -c valid methods are
+               git,git+https,git+ssh,svn,svn+file,svn+http,
+               svn+https,svn+ssh  default method is git
 
 By default, (no options) portest does nothing
 EOF
 	exit 1
 }
 
-while getopts ":abj:f:pPrRtTuv" FLAG; do
+while getopts ":abcj:f:m:pPrRtTuv" FLAG; do
 	case "${FLAG}" in
 	a)
 		ALL="YES"
@@ -66,12 +72,17 @@ while getopts ":abj:f:pPrRtTuv" FLAG; do
 	b)
 		REPO_BUILD_LIST="YES"
 		;;
+	c)
+		CREATE_REPO="YES"
+		;;
 	j)
 		POUDRIERE_JAILS="${OPTARG}"
 		;;
 	f)
 		POUDRIERE_BULK="YES"
 		POUDRIERE_BULK_FILE="${OPTARG}"
+		;;
+	m)	METHOD="${OPTARG}"
 		;;
 	p)
 		DO_PATCH="YES"
@@ -102,17 +113,50 @@ done
 
 shift "$((OPTIND-1))"
 
+if [ "${CREATE_REPO}" != "YES" ]; then
 [ $# -lt 1 ] && usage 
+fi
+
+if [ "${CREATE_REPO}" == "YES" ]; then
+	: ${METHOD:="git"}
+	: ${GIT_URL:="github.com/freebsd/freebsd-ports"}
+	: ${GIT_URL_SSH:="github.com:/freebsd/freebsd-ports"}
+	: ${SVN_URL:="svn.FreeBSD.org/ports"}
+	case ${METHOD} in
+	git) PROTO="git" ;;
+	git+https) PROTO="https" ;;
+	git+ssh) PROTO="ssh" ;;
+	svn) PROTO="svn" ;;
+	svn+file) PROTO="file" ;;
+	svn+http) PROTO="http" ;;
+	svn+https) PROTO="https" ;;
+	svn+ssh) PROTO="svn+ssh" ;;
+	*) usage;;
+	esac
+
+	case ${METHOD} in
+	git*) : ${BRANCH:="master"};;
+	svn*) : ${BRANCH:="head"} ;;
+	esac
+
+	case ${METHOD} in
+	git+ssh) GIT_REPO_URL="${PROTO}@${GIT_URL_SSH}" ;;
+	git*) GIT_REPO_URL="${PROTO}://${GIT_URL}" ;;
+	svn*) SVN_REPO_URL="${PROTO}://${SVN_URL}/${BRANCH}" ;;
+	esac
+fi
 
 : ${PATCH:="patch"}
 : ${PATCH_SVN_ARGS:="-Esf"}
 : ${PATCH_GIT_ARGS:="-Esfp1"}
 : ${SVN:="svnlite"}
+: ${SVN_CHECKOUT_ARGS:="checkout ${SVN_REPO_URL}"}
 : ${SVN_REVERT_ARGS:="revert -R"}
 : ${SVN_STATUS_ARGS:="status"}
 : ${SVN_UPDATE_ARGS:="update"}
 : ${GIT:="git"}
 : ${GIT_CLEAN_ARGS:="clean -Xfd -f"}
+: ${GIT_CLONE_ARGS:="clone --depth 1 -b ${BRANCH} ${GIT_REPO_URL}"}
 : ${GIT_RESET_ARGS:="reset --hard"}
 : ${GIT_STATUS_ARGS:="status -s"}
 : ${GIT_UPDATE_ARGS:="pull"}
@@ -142,14 +186,6 @@ fi
 
 CURDIR="`pwd`"
 
-# Check PORTSDIR #
-! [ -d "${PORTSDIR}" ] && echo "PORTSDIR not set or incorrect directory" && exit 1
-
-if [ "FreeBSD Ports Collection" != "`head -1 "${PORTSDIR}/README" | grep -o \"FreeBSD Ports Collection\"`" ]; then
-	echo "PORTSDIR is set to an incorrect directory"
-	exit 1
-fi
-
 # Check for commands #
 ${SVN} help >/dev/null 2>&1
 if [ "$?" -ne "0" ]; then
@@ -160,6 +196,37 @@ if [ "$?" -ne "0" ]; then
 	GIT_CHECK="NO"
 fi
 
+### Create Repo ###
+if [ "${CREATE_REPO}" == "YES" ]; then
+	case ${METHOD} in
+		git*)
+		if [ "${GIT_CHECK}" == "NO" ]; then
+		echo "git not found change the method or install git" && exit 1
+		fi
+		${GIT} ${GIT_CLONE_ARGS} $1
+		if [ "$?" != "0" ]; then
+		echo "git clone failed" && exit 1
+		fi
+		;;
+		svn*)
+		if [ "${SVN_CHECK}" == "NO" ]; then
+		echo "svn or svnlite not found, please install to use this method" && exit 1
+		fi
+		${SVN} ${SVN_CHECKOUT_ARGS} $1
+		if [ "$?" != "0" ]; then
+		echo "svn checkout failed" && exit 1
+		fi
+		;;
+	esac
+	exit 0
+fi
+# Check PORTSDIR #
+! [ -d "${PORTSDIR}" ] && echo "PORTSDIR not set or incorrect directory" && exit 1
+
+if [ "FreeBSD Ports Collection" != "`head -1 "${PORTSDIR}/README" | grep -o \"FreeBSD Ports Collection\"`" ]; then
+	echo "PORTSDIR is set to an incorrect directory"
+	exit 1
+fi
 # Check PORTSDIR is an svn or git tree #
 cd ${PORTSDIR}
 if [ "${SVN_CHECK}" != "NO" ]; then
@@ -180,7 +247,7 @@ if [ "${GIT_CHECK}" != "NO" ]; then
 fi
 
 if [ "${REPO_BUILD_LIST}" == "YES" ]; then
-	[ -z "${REPO_TYPE}" ] && echo "Port tree is not a svn or git tree, This is required with the -b option" && exit 1
+	[ -z "${REPO_TYPE}" ] && echo "Port tree is not a svn or git repo, This is required with the -b option" && exit 1
 fi
 # Set patchfile path #
 cd "${PORTSDIR}"
