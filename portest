@@ -56,7 +56,7 @@ Options:
                only used with -T option
     -m     --  Repo method, only used with -c valid methods are
                git,git+https,git+ssh,svn,svn+file,svn+http,
-               svn+https,svn+ssh  default method is git
+               svn+https,svn+ssh,portsnap  default method is git
     -U     --  Sets USE_POUDRIERE="YES" and sets port tree to use
 
 By default, (no options) portest does nothing
@@ -131,11 +131,13 @@ while getopts ":abcd:j:f:m:pPrRtTuU:v" FLAG; do
 	esac
 done
 
+[ $# -lt 1 ] && usage
+
 shift "$((OPTIND-1))"
 
 if [ ${REPO_BUILD_LIST} -ne 1 ]; then
-[ $(( ALL + POUDRIERE_BULK + DO_PATCH + PATCH_FAILED_EXIT + REVERT_SOFT + TEST_PORTLINT + TEST_BUILD )) -ge 1 ] && [ $? -lt 1 ] && usage
-elif [ $(( DO_PATCH + PATCH_FAILED_EXIT )) -ge 1 ] && [ $? -lt 1 ]; then
+[ $(( ALL + POUDRIERE_BULK + DO_PATCH + PATCH_FAILED_EXIT + REVERT_SOFT + TEST_PORTLINT + TEST_BUILD )) -ge 1 ] && [ $# -lt 1 ] && usage
+elif [ $(( DO_PATCH + PATCH_FAILED_EXIT )) -ge 1 ] && [ $# -lt 1 ]; then
 	usage;
 fi
 
@@ -152,6 +154,7 @@ if [ "${CREATE_REPO}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	svn+http) PROTO="http" ;;
 	svn+https) PROTO="https" ;;
 	svn+ssh) PROTO="svn+ssh" ;;
+	portsnap) ;;
 	*) usage;;
 	esac
 
@@ -170,6 +173,9 @@ fi
 : ${PATCH:="patch"}
 : ${PATCH_SVN_ARGS:="-Esf"}
 : ${PATCH_GIT_ARGS:="-Esfp1"}
+: ${PORTSNAP:="portsnap"}
+: ${PORTSNAP_CREATE_ARGS:="fetch extract"}
+: ${PORTSNAP_UPDATE_ARGS:="fetch update"}
 : ${SVN:="svn"}
 : ${SVN_CHECKOUT_ARGS:="checkout ${SVN_REPO_URL}"}
 : ${SVN_REVERT_ARGS:="revert -R"}
@@ -199,7 +205,7 @@ fi
 : ${POUDRIERE_PORT:="default"}
 : ${POUDRIERE:="poudriere"}
 : ${POUDRIERE_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
-: ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"}
+: ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT} fetch extract"}
 
 # Set poudriere ports dir if being used #
 if [ "${USE_POUDRIERE}" == "YES" ]; then
@@ -222,6 +228,10 @@ ${GIT} help >/dev/null 2>&1
 if [ "$?" -ne "0" ]; then
 	GIT_CHECK="NO"
 fi
+${PORTSNAP} >/dev/null 2>&1
+if [ "$?" -ne "0" ]; then
+	PORTSNAP_CHECK="NO"
+fi
 
 check_git() {
 if [ "${GIT_CHECK}" == "NO" ]; then
@@ -234,6 +244,11 @@ if [ "${SVN_CHECK}" == "NO" ]; then
 echo "svn or svnlite not found. Try installing it, pkg install subversion" && exit 1
 fi
 }
+
+check_empty_dir() {
+	mkdir -p "$1"
+	[ ! "`find \"$1\" -type d -empty -maxdepth 1`" ] && echo ${PORTSDIR} is not empty && exit 1
+}
 ### Create Repo ###
 if [ "${CREATE_REPO}" -eq "1" ]; then
 	if [ "${USE_POUDRIERE}" == "YES" ]; then
@@ -242,16 +257,31 @@ if [ "${CREATE_REPO}" -eq "1" ]; then
 		case ${METHOD} in
 			git*)
 			check_git;
+			check_empty_dir "${PORTSDIR}";
 			${GIT} ${GIT_CLONE_ARGS} "${PORTSDIR}"
-			if [ "$?" != "0" ]; then
+			if [ "$?" -ne "0" ]; then
 			echo "git clone failed" && exit 1
 			fi
 			;;
 			svn*)
 			check_svn;
+			check_empty_dir "${PORTSDIR}";
 			${SVN} ${SVN_CHECKOUT_ARGS} "${PORTSDIR}"
-			if [ "$?" != "0" ]; then
+			if [ "$?" -ne "0" ]; then
 			echo "svn checkout failed" && exit 1
+			fi
+			;;
+			portsnap)
+			check_empty_dir "${PORTSDIR}";
+			cd ${PORTSDIR} && PORTSDIR="`pwd`"
+			if [ "${PORTSDIR}" != "/usr/ports" ]; then
+				mkdir : ${PORTSNAP_WRKDIR:="${PORTSDIR}/.snap"}
+				${PORTSNAP} -d "${PORTSNAP_WRKDIR}" -p "${PORTSDIR}" ${PORTSNAP_CREATE_ARGS}
+			else
+				${PORTSNAP} ${PORTSNAP_CREATE_ARGS}
+			fi
+			if [ "$?" -ne "0" ]; then
+			echo "portsnap creation failed" && exit 1
 			fi
 			;;
 		esac
@@ -259,8 +289,7 @@ if [ "${CREATE_REPO}" -eq "1" ]; then
 fi
 # Check PORTSDIR #
 ! [ -d "${PORTSDIR}" ] && echo "PORTSDIR not set or incorrect directory" && exit 1
-cd ${PORTSDIR}
-PORTSDIR="`pwd`"
+cd ${PORTSDIR} && PORTSDIR="`pwd`"
 
 if [ "FreeBSD Ports Collection" != "`head -1 "${PORTSDIR}/README" | grep -o \"FreeBSD Ports Collection\"`" ]; then
 	echo "PORTSDIR is set to an incorrect directory"
@@ -284,10 +313,26 @@ if [ "${GIT_CHECK}" != "NO" ]; then
 		REPO_STATUS="${GIT_STATUS_ARGS}"
 	fi
 fi
+if [ -z "${REPO_TYPE}" ] && [ "${PORTSNAP_CHECK}" != "NO" ]; then
+	if [ "${PORTSDIR}" != "/usr/ports" ]; then
+		: ${PORTSNAP_WRKDIR:="${PORTSDIR}/.snap"}
+		: ${PORTSNAP_ARGS:="-d ${PORTSNAP_WRKDIR} -p ${PORTSDIR}"}
+	else
+		: ${PORTSNAP_WRKDIR:=""}
+		: ${PORTSNAP_ARGS:=""}
+	fi
+	REPO_TYPE="portsnap"
+	! [ -d "${PORTSNAP_WRKDIR}" ] && echo "Unsupported repo or portsnap wrkdir not found. Set PORTSNAP_WRKDIR if the latter"
+fi
 
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
-	[ -z "${REPO_TYPE}" ] && echo "Port tree is not a svn or git repo, This is required with the -b option" && exit 1
+	case ${REPO_TYPE} in
+	svn*);;
+	git*);;
+	*) echo "Port tree is not a svn or git repo, This is required with the -b option" && exit 1 ;;
+	esac
 fi
+
 # Set patchfile path #
 cd "${PORTSDIR}"
 for file in "${@}"; do
@@ -333,6 +378,8 @@ cd ${PORTSDIR}
 			${GIT} ${GIT_UPDATE_ARGS}
 			${GIT} ${GIT_STASHPOP_ARGS}
 		;;
+		portsnap)
+			${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_UPDATE_ARGS}
 	esac
 fi
 
