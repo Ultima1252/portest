@@ -157,7 +157,7 @@ fi
 : ${PATCH:="patch"}
 : ${PATCH_SVN_ARGS:="-Esf"}
 : ${PATCH_GIT_ARGS:="-Esfp1"}
-: ${SVN:="svnlite"}
+: ${SVN:="svn"}
 : ${SVN_CHECKOUT_ARGS:="checkout ${SVN_REPO_URL}"}
 : ${SVN_REVERT_ARGS:="revert -R"}
 : ${SVN_STATUS_ARGS:="status"}
@@ -198,13 +198,27 @@ CURDIR="`pwd`"
 # Check for commands #
 ${SVN} help >/dev/null 2>&1
 if [ "$?" -ne "0" ]; then
-	SVN_CHECK="NO"
+	svnlite help >/dev/null 2>&1
+	if [ "$?" -eq "0" ]; then
+		SVN="svnlite"
+	else
+		SVN_CHECK="NO"
+	fi
 fi
 ${GIT} help >/dev/null 2>&1
 if [ "$?" -ne "0" ]; then
 	GIT_CHECK="NO"
 fi
 
+check_git() {
+if [ "${GIT_CHECK}" == "NO" ]; then
+echo "git not found. Try installing it, pkg install git" && exit 1
+fi }
+
+check_svn() {
+if [ "${SVN_CHECK}" == "NO" ]; then
+echo "svn or svnlite not found. Try installing it, pkg install subversion" && exit 1
+fi }
 ### Create Repo ###
 if [ "${CREATE_REPO}" == "YES" ]; then
 	if [ "${USE_POUDRIERE}" == "YES" ]; then
@@ -212,18 +226,14 @@ if [ "${CREATE_REPO}" == "YES" ]; then
 	else
 		case ${METHOD} in
 			git*)
-			if [ "${GIT_CHECK}" == "NO" ]; then
-			echo "git not found change the method or install git" && exit 1
-			fi
+			check_git;
 			${GIT} ${GIT_CLONE_ARGS} "${PORTSDIR}"
 			if [ "$?" != "0" ]; then
 			echo "git clone failed" && exit 1
 			fi
 			;;
 			svn*)
-			if [ "${SVN_CHECK}" == "NO" ]; then
-			echo "svn or svnlite not found, please install to use this method" && exit 1
-			fi
+			check_svn;
 			${SVN} ${SVN_CHECKOUT_ARGS} "${PORTSDIR}"
 			if [ "$?" != "0" ]; then
 			echo "svn checkout failed" && exit 1
