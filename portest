@@ -205,7 +205,7 @@ fi
 : ${POUDRIERE_PORT:="default"}
 : ${POUDRIERE:="poudriere"}
 : ${POUDRIERE_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
-: ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT} fetch extract"}
+: ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"}
 
 # Set poudriere ports dir if being used #
 if [ "${USE_POUDRIERE}" == "YES" ]; then
