@@ -30,14 +30,12 @@ PORTEST_VERSION="0.0.5"
 
 usage() {
 	cat << EOF
-Usage: portest [-f bulkfile] [-j "jail1 jail2"] [-abpPrRtTv] file.diff file2.diff ...
-       portest [-m git] [-c] /new/repo/path
+Usage: portest [-m git] [-f bulkfile] [-U default2] [-d PORTSDIR] [-abcdpPrRtTUv] \\
+               file.diff file2.diff ...
 
 Parameters:
     -a     --  Do everything except revert and port test (-ptf build.ports.txt)
-    -c     --  Create repo then exits, this option supersedes all
-               other options if USE_POUDRIERE is enabled, will
-               create a poudriere port to use
+    -c     --  Create repo, see -m for supported protocols
     -f     --  Generate a poudiere usable bulk file
     -p     --  Patch, will exit on fail with output
     -P     --  Patch, do not exit on failed patch
@@ -52,19 +50,21 @@ Parameters:
 Options:
     -b     --  Generate the list of cat/ports based on port tree
                instead of diff, slow
+    -d     --  Sets PORTSDIR, -U overrides this option
     -j     --  Jails used for poudriere, if multiple are used
-               must be in "" with a space as a seperator
-               overrides conf, only used with -T option
+               must be in "" with a space as a seperator,
+               only used with -T option
     -m     --  Repo method, only used with -c valid methods are
                git,git+https,git+ssh,svn,svn+file,svn+http,
                svn+https,svn+ssh  default method is git
+    -U     --  Sets USE_POUDRIERE="YES" and sets port tree to use
 
 By default, (no options) portest does nothing
 EOF
 	exit 1
 }
 
-while getopts ":abcj:f:m:pPrRtTuv" FLAG; do
+while getopts ":abcd:j:f:m:pPrRtTuU:v" FLAG; do
 	case "${FLAG}" in
 	a)
 		ALL="YES"
@@ -75,6 +75,9 @@ while getopts ":abcj:f:m:pPrRtTuv" FLAG; do
 	c)
 		CREATE_REPO="YES"
 		;;
+	d)
+		PORTSDIR="${OPTARG}"
+		;;
 	j)
 		POUDRIERE_JAILS="${OPTARG}"
 		;;
@@ -82,7 +85,8 @@ while getopts ":abcj:f:m:pPrRtTuv" FLAG; do
 		POUDRIERE_BULK="YES"
 		POUDRIERE_BULK_FILE="${OPTARG}"
 		;;
-	m)	METHOD="${OPTARG}"
+	m)	
+		METHOD="${OPTARG}"
 		;;
 	p)
 		DO_PATCH="YES"
@@ -105,6 +109,10 @@ while getopts ":abcj:f:m:pPrRtTuv" FLAG; do
 	u)
 		UPDATE_REPO="YES"
 		;;
+	U)
+		USE_POUDRIERE="YES"
+		POUDRIERE_PORT="${OPTARG}"
+		;;
 	v)
 		echo "${PORTEST_VERSION}"
 		exit 0
@@ -117,8 +125,8 @@ if [ "${CREATE_REPO}" != "YES" ]; then
 [ $# -lt 1 ] && usage 
 fi
 
-if [ "${CREATE_REPO}" == "YES" ]; then
-	: ${METHOD:="git"}
+: ${METHOD:="git"}
+if [ "${CREATE_REPO}" == "YES" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	: ${GIT_URL:="github.com/freebsd/freebsd-ports"}
 	: ${GIT_URL_SSH:="github.com:/freebsd/freebsd-ports"}
 	: ${SVN_URL:="svn.FreeBSD.org/ports"}
@@ -172,12 +180,13 @@ fi
 : ${BULK_FILE:="build.ports.txt"}
 
 
-: ${USE_POUDRIERE:="YES"}
+: ${USE_POUDRIERE:="NO"}
 : ${POUDRIERE_JAILS:=""}
 : ${POUDRIERE_PORTSDIR:="/usr/local/poudriere/ports"}
 : ${POUDRIERE_PORT:="default"}
 : ${POUDRIERE:="poudriere"}
 : ${POUDRIERE_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
+: ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"}
 
 # Set poudriere ports dir if being used #
 if [ "${USE_POUDRIERE}" == "YES" ]; then
@@ -198,30 +207,35 @@ fi
 
 ### Create Repo ###
 if [ "${CREATE_REPO}" == "YES" ]; then
-	case ${METHOD} in
-		git*)
-		if [ "${GIT_CHECK}" == "NO" ]; then
-		echo "git not found change the method or install git" && exit 1
-		fi
-		${GIT} ${GIT_CLONE_ARGS} $1
-		if [ "$?" != "0" ]; then
-		echo "git clone failed" && exit 1
-		fi
-		;;
-		svn*)
-		if [ "${SVN_CHECK}" == "NO" ]; then
-		echo "svn or svnlite not found, please install to use this method" && exit 1
-		fi
-		${SVN} ${SVN_CHECKOUT_ARGS} $1
-		if [ "$?" != "0" ]; then
-		echo "svn checkout failed" && exit 1
-		fi
-		;;
-	esac
-	exit 0
+	if [ "${USE_POUDRIERE}" == "YES" ]; then
+		${POUDRIERE} ${POUDRIERE_PORTS_ARGS}
+	else
+		case ${METHOD} in
+			git*)
+			if [ "${GIT_CHECK}" == "NO" ]; then
+			echo "git not found change the method or install git" && exit 1
+			fi
+			${GIT} ${GIT_CLONE_ARGS} "${PORTSDIR}"
+			if [ "$?" != "0" ]; then
+			echo "git clone failed" && exit 1
+			fi
+			;;
+			svn*)
+			if [ "${SVN_CHECK}" == "NO" ]; then
+			echo "svn or svnlite not found, please install to use this method" && exit 1
+			fi
+			${SVN} ${SVN_CHECKOUT_ARGS} "${PORTSDIR}"
+			if [ "$?" != "0" ]; then
+			echo "svn checkout failed" && exit 1
+			fi
+			;;
+		esac
+	fi
 fi
 # Check PORTSDIR #
 ! [ -d "${PORTSDIR}" ] && echo "PORTSDIR not set or incorrect directory" && exit 1
+cd ${PORTSDIR}
+PORTSDIR="`pwd`"
 
 if [ "FreeBSD Ports Collection" != "`head -1 "${PORTSDIR}/README" | grep -o \"FreeBSD Ports Collection\"`" ]; then
 	echo "PORTSDIR is set to an incorrect directory"
