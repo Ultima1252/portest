@@ -128,12 +128,12 @@ fi
 : ${METHOD:="git"}
 if [ "${CREATE_REPO}" == "YES" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	: ${GIT_URL:="github.com/freebsd/freebsd-ports"}
-	: ${GIT_URL_SSH:="github.com:/freebsd/freebsd-ports"}
+	: ${GIT_URL_SSH:="github.com:/freebsd/freebsd-ports.git"}
 	: ${SVN_URL:="svn.FreeBSD.org/ports"}
 	case ${METHOD} in
 	git) PROTO="git" ;;
 	git+https) PROTO="https" ;;
-	git+ssh) PROTO="ssh" ;;
+	git+ssh) PROTO="git" ;;
 	svn) PROTO="svn" ;;
 	svn+file) PROTO="file" ;;
 	svn+http) PROTO="http" ;;
