@@ -64,16 +64,28 @@ EOF
 	exit 1
 }
 
+ALL="0"
+POUDRIERE_BULK="0"
+DO_PATCH="0"
+PATCH_FAILED_EXIT="0"
+REVERT_SOFT="0"
+REVERT_HARD="0"
+TEST_PORTLINT="0"
+TEST_BUILD="0"
+REPO_BUILD_LIST="0"
+CREATE_REPO="0"
+UPDATE_REPO="0"
+
 while getopts ":abcd:j:f:m:pPrRtTuU:v" FLAG; do
 	case "${FLAG}" in
 	a)
-		ALL="YES"
+		ALL="1"
 		;;
 	b)
-		REPO_BUILD_LIST="YES"
+		REPO_BUILD_LIST="1"
 		;;
 	c)
-		CREATE_REPO="YES"
+		CREATE_REPO="1"
 		;;
 	d)
 		PORTSDIR="${OPTARG}"
@@ -82,32 +94,32 @@ while getopts ":abcd:j:f:m:pPrRtTuU:v" FLAG; do
 		POUDRIERE_JAILS="${OPTARG}"
 		;;
 	f)
-		POUDRIERE_BULK="YES"
+		POUDRIERE_BULK="1"
 		POUDRIERE_BULK_FILE="${OPTARG}"
 		;;
 	m)	
 		METHOD="${OPTARG}"
 		;;
 	p)
-		DO_PATCH="YES"
+		DO_PATCH="1"
 		;;
 	P)
-		PATCH_FAILED_EXIT="NO"
+		PATCH_FAILED_EXIT="1"
 		;;
 	r)
-		REVERT_SOFT="YES"
+		REVERT_SOFT="1"
 		;;
 	R)
-		REVERT_HARD="YES"
+		REVERT_HARD="1"
 		;;
 	t)
-		TEST_PORTLINT="YES"
+		TEST_PORTLINT="1"
 		;;
 	T)
-		TEST_BUILD="YES"
+		TEST_BUILD="1"
 		;;
 	u)
-		UPDATE_REPO="YES"
+		UPDATE_REPO="1"
 		;;
 	U)
 		USE_POUDRIERE="YES"
@@ -121,12 +133,14 @@ done
 
 shift "$((OPTIND-1))"
 
-if [ "${CREATE_REPO}" != "YES" ]; then
-[ $# -lt 1 ] && usage 
+if [ ${REPO_BUILD_LIST} -ne 1 ]; then
+[ $(( ALL + POUDRIERE_BULK + DO_PATCH + PATCH_FAILED_EXIT + REVERT_SOFT + TEST_PORTLINT + TEST_BUILD )) -ge 1 ] && [ $? -lt 1 ] && usage
+elif [ $(( DO_PATCH + PATCH_FAILED_EXIT )) -ge 1 ] && [ $? -lt 1 ]; then
+	usage;
 fi
 
 : ${METHOD:="git"}
-if [ "${CREATE_REPO}" == "YES" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
+if [ "${CREATE_REPO}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	: ${GIT_URL:="github.com/freebsd/freebsd-ports"}
 	: ${SVN_URL:="svn.FreeBSD.org/ports"}
 	case ${METHOD} in
@@ -221,7 +235,7 @@ echo "svn or svnlite not found. Try installing it, pkg install subversion" && ex
 fi
 }
 ### Create Repo ###
-if [ "${CREATE_REPO}" == "YES" ]; then
+if [ "${CREATE_REPO}" -eq "1" ]; then
 	if [ "${USE_POUDRIERE}" == "YES" ]; then
 		${POUDRIERE} ${POUDRIERE_PORTS_ARGS}
 	else
@@ -271,7 +285,7 @@ if [ "${GIT_CHECK}" != "NO" ]; then
 	fi
 fi
 
-if [ "${REPO_BUILD_LIST}" == "YES" ]; then
+if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 	[ -z "${REPO_TYPE}" ] && echo "Port tree is not a svn or git repo, This is required with the -b option" && exit 1
 fi
 # Set patchfile path #
@@ -299,7 +313,7 @@ for file in ${PATCH_FILE}; do
 done
 
 # Check for valid jails #
-if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" == "YES" ]; then
+if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 	[ -z "${POUDRIERE_JAILS}" ] && echo "no jails selected use -j or export POUDRIERE_JAILS=\"jail1 jail2\""
 	for jail in ${POUDRIERE_JAILS}; do
 	${POUDRIERE} jail -i -j $jail >/dev/null 2>&1
@@ -308,7 +322,7 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" == "YES" ]; then
 fi
 
 ### Update Repo ###
-if [ "${UPDATE_REPO}" == "YES" ]; then
+if [ "${UPDATE_REPO}" -eq "1" ]; then
 cd ${PORTSDIR}
 	case ${REPO_TYPE} in
 		svn)
@@ -323,7 +337,7 @@ cd ${PORTSDIR}
 fi
 
 ### Patch Tree ###
-if [ "${DO_PATCH}" == "YES" ] || [ "${PATCH_FAILED_EXIT}" == "NO" ] || [ "${ALL}" == "YES" ]; then
+if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	for file in ${SVN_PATCH_FILE}; do
 	PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_SVN_ARGS} -d "${PORTSDIR}" -i "$file"`
@@ -337,7 +351,7 @@ if [ "${DO_PATCH}" == "YES" ] || [ "${PATCH_FAILED_EXIT}" == "NO" ] || [ "${ALL}
 			cat "${PORTSDIR}/$file"
 		done
 		
-	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ] && [ "${PATCH_FAILED_EXIT}" != "NO" ]; then
+	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ] && [ "${PATCH_FAILED_EXIT}" -ne "1" ]; then
 		echo "${PATCH_OUTPUT}"
 		echo "Patch Failed"
 		exit 1
@@ -353,7 +367,7 @@ fi
 # Generate a list of ports for poudriere to build #
 buildlist() {
 
-if [ "${REPO_BUILD_LIST}" == "YES" ]; then
+if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 cd ${PORTSDIR}
 BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
 else
@@ -365,18 +379,18 @@ fi
 }
 
 ### Bulk File ###
-if [ "$POUDRIERE_BULK" == "YES" ]; then
+if [ "$POUDRIERE_BULK" -eq "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 	cd "${CURDIR}"
 	echo "${BUILD_LIST}" >"${POUDRIERE_BULK_FILE}"
-elif [ "${ALL}" == "YES" ]; then
+elif [ "${ALL}" -eq "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 	cd "${CURDIR}"
 	echo "${BUILD_LIST}" >"${BULK_FILE}"
 fi
 
 ### Portlint ###
-if [ "${TEST_PORTLINT}" == "YES" ] || [ "${ALL}" == "YES" ]; then
+if [ "${TEST_PORTLINT}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 	for port in ${BUILD_LIST}; do
 		cd "${PORTSDIR}/$port"
@@ -387,7 +401,7 @@ fi
 
 
 ### Port test and Poudriere testing ###
-if [ "${TEST_BUILD}" == "YES" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
+if [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	${RM} ${RM_ARGS} "`find ${PORTSDIR} -type directory -name "work" -maxdepth 3`"
 	[ -z "${BUILD_LIST}" ] && buildlist
 	for port in ${BUILD_LIST}; do
@@ -395,7 +409,7 @@ if [ "${TEST_BUILD}" == "YES" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 		make depends BATCH=yes
 		${PORT} ${PORT_ARGS}
 	done
-elif [ "${TEST_BUILD}" == "YES" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
+elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 	for jail in ${POUDRIERE_JAILS}; do
 		${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
@@ -406,7 +420,7 @@ fi
 cd ${PORTSDIR}
 case ${REPO_TYPE} in
 	svn)
-if [ "${REVERT_SOFT}" == "YES" ] && [ "${REVERT_HARD}" != "YES" ]; then
+if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 # Generate a list of files that were patched #
 	[ -n "${SVN_PATCH_FILE}" ] && PATCH_FILES_LIST="`cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $2 }'`"
@@ -421,10 +435,10 @@ if [ "${REVERT_SOFT}" == "YES" ] && [ "${REVERT_HARD}" != "YES" ]; then
 	for file in ${PATCH_FILES_LIST}; do
 		${RM} ${RM_ARGS} "${PORTSDIR}/$file"
 	done
-	${SVN} ${SVN_REVERT_ARGS} ${BUILD_LIST}
-	${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
+	[ -n "${BUILD_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${BUILD_LIST}
+	[ -n "${PATCH_FILES_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
 	[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
-elif [ "${REVERT_HARD}"  == "YES" ]; then
+elif [ "${REVERT_HARD}"  -eq "1" ]; then
 	for file in `${SVN} status | awk '{ print $2 }'`; do
 		${RM} ${RM_ARGS} "${PORTSDIR}/$file"
 	done
@@ -432,7 +446,7 @@ elif [ "${REVERT_HARD}"  == "YES" ]; then
 fi
 	;;
 	git)
-if [ "${REVERT_SOFT}" == "YES" ] || [ "${REVERT_HARD}" == "YES" ]; then
+if [ "${REVERT_SOFT}" -eq "1" ] || [ "${REVERT_HARD}" -eq "1" ]; then
 	${GIT} ${GIT_CLEAN_ARGS}
 	${GIT} ${GIT_RESET_ARGS}
 fi
