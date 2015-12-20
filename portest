@@ -128,7 +128,6 @@ fi
 : ${METHOD:="git"}
 if [ "${CREATE_REPO}" == "YES" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	: ${GIT_URL:="github.com/freebsd/freebsd-ports"}
-	: ${GIT_URL_SSH:="github.com:/freebsd/freebsd-ports.git"}
 	: ${SVN_URL:="svn.FreeBSD.org/ports"}
 	case ${METHOD} in
 	git) PROTO="git" ;;
@@ -148,7 +147,7 @@ if [ "${CREATE_REPO}" == "YES" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	esac
 
 	case ${METHOD} in
-	git+ssh) GIT_REPO_URL="${PROTO}@${GIT_URL_SSH}" ;;
+	git+ssh) GIT_REPO_URL="`echo ${PROTO}@${GIT_URL} | sed 's/\//\:&/'`" ;;
 	git*) GIT_REPO_URL="${PROTO}://${GIT_URL}" ;;
 	svn*) SVN_REPO_URL="${PROTO}://${SVN_URL}/${BRANCH}" ;;
 	esac
@@ -213,12 +212,14 @@ fi
 check_git() {
 if [ "${GIT_CHECK}" == "NO" ]; then
 echo "git not found. Try installing it, pkg install git" && exit 1
-fi }
+fi
+}
 
 check_svn() {
 if [ "${SVN_CHECK}" == "NO" ]; then
 echo "svn or svnlite not found. Try installing it, pkg install subversion" && exit 1
-fi }
+fi
+}
 ### Create Repo ###
 if [ "${CREATE_REPO}" == "YES" ]; then
 	if [ "${USE_POUDRIERE}" == "YES" ]; then
