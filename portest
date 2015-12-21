@@ -174,8 +174,9 @@ fi
 : ${PATCH_SVN_ARGS:="-Esf"}
 : ${PATCH_GIT_ARGS:="-Esfp1"}
 : ${PORTSNAP:="portsnap"}
-: ${PORTSNAP_CREATE_ARGS:="fetch extract"}
-: ${PORTSNAP_UPDATE_ARGS:="fetch update"}
+: ${PORTSNAP_FETCH_ARGS:="fetch"}
+: ${PORTSNAP_EXTRACT_ARGS:="extract"}
+: ${PORTSNAP_UPDATE_ARGS:="update"}
 : ${SVN:="svn"}
 : ${SVN_CHECKOUT_ARGS:="checkout ${SVN_REPO_URL}"}
 : ${SVN_REVERT_ARGS:="revert -R"}
@@ -276,9 +277,9 @@ if [ "${CREATE_REPO}" -eq "1" ]; then
 			cd ${PORTSDIR} && PORTSDIR="`pwd`"
 			if [ "${PORTSDIR}" != "/usr/ports" ]; then
 				mkdir : ${PORTSNAP_WRKDIR:="${PORTSDIR}/.snap"}
-				${PORTSNAP} -d "${PORTSNAP_WRKDIR}" -p "${PORTSDIR}" ${PORTSNAP_CREATE_ARGS}
+				${PORTSNAP} -d "${PORTSNAP_WRKDIR}" -p "${PORTSDIR}" ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_EXTRACT_ARGS}
 			else
-				${PORTSNAP} ${PORTSNAP_CREATE_ARGS}
+				${PORTSNAP} ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_EXTRACT_ARGS}
 			fi
 			if [ "$?" -ne "0" ]; then
 			echo "portsnap creation failed" && exit 1
@@ -290,6 +291,7 @@ fi
 # Check PORTSDIR #
 ! [ -d "${PORTSDIR}" ] && echo "PORTSDIR not set or incorrect directory" && exit 1
 cd ${PORTSDIR} && PORTSDIR="`pwd`"
+: ${BACKUPDIR:="${PORTSDIR}/.bak"}
 
 if [ "FreeBSD Ports Collection" != "`head -1 "${PORTSDIR}/README" | grep -o \"FreeBSD Ports Collection\"`" ]; then
 	echo "PORTSDIR is set to an incorrect directory"
@@ -379,12 +381,22 @@ cd ${PORTSDIR}
 			${GIT} ${GIT_STASHPOP_ARGS}
 		;;
 		portsnap)
-			${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_UPDATE_ARGS}
+			${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_UPDATE_ARGS}
 	esac
 fi
 
 ### Patch Tree ###
 if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
+	if [ "${REPO_TYPE}" == "portsnap" ]; then
+		[ -n "${SVN_PATCH_FILE}" ] && PATCHED_FILES="`cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $2 }'`"
+		[ -n "${GIT_PATCH_FILE}" ] && PATCHED_FILES="${PATCHED_FILES}
+"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\///'`
+		mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
+		mkdir -p `echo "${PATCHED_FILES}" | grep -o '^.*\/.*\/' | sort | awk '!a[$0]++'`
+		for file in ${PATCHED_FILES}; do
+			! [ -f "${BACKUPDIR}/$file" ] && cp "${PORTSDIR}/$file" "${BACKUPDIR}/$file"
+		done
+	fi
 	for file in ${SVN_PATCH_FILE}; do
 	PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_SVN_ARGS} -d "${PORTSDIR}" -i "$file"`
@@ -403,11 +415,18 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}"
 		echo "Patch Failed"
 		exit 1
 	else
-		if [ "svn" == "${REPO_TYPE}" ]; then
+		case "${REPO_TYPE}" in
+		svn*)
 			${RM} `${SVN} ${SVN_STATUS_ARGS} | awk '{ print $2 }' | grep ".*\.orig"` >/dev/null
-		elif [ "git" == "${REPO_TYPE}" ]; then
+		;;
+		git*)
 			${GIT} ${GIT_CLEAN_ARGS} >/dev/null
-		fi
+		;;
+		portsnap)
+			cd ${PORTSDIR}
+			${RM} `find ./ -maxdepth 4 -name "*.orig"`
+		;;
+		esac
 	fi
 fi
 
@@ -496,6 +515,23 @@ fi
 if [ "${REVERT_SOFT}" -eq "1" ] || [ "${REVERT_HARD}" -eq "1" ]; then
 	${GIT} ${GIT_CLEAN_ARGS}
 	${GIT} ${GIT_RESET_ARGS}
+fi
+	;;
+	portsnap)
+if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
+	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
+	cd ${BACKUPDIR}
+	PATCHED_FILES="`find ./ -type f`"
+	for file in `echo "${PATCHED_FILES}" | sed 's/^\.\///'`; do
+	mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
+	done
+	cd ${PORTSDIR}
+	rm -r ${BACKUPDIR}
+	rm `find ./ -maxdepth 4 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+elif [ "${REVERT_HARD}"  -eq "1" ]; then
+	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
+	cd ${PORTSDIR}
+	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
 fi
 	;;
 esac
