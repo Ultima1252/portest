@@ -49,7 +49,7 @@ Parameters:
     -v     --  Show version of portest then exit
 Options:
     -b     --  Generate the list of cat/ports based on port tree
-               instead of diff, slow
+               instead of diff, git and svn only, slow
     -d     --  Sets PORTSDIR, -U overrides this option
     -j     --  Jails used for poudriere, if multiple are used
                must be in "" with a space as a seperator,
@@ -248,7 +248,7 @@ fi
 
 check_empty_dir() {
 	mkdir -p "$1"
-	[ ! "`find \"$1\" -type d -empty -maxdepth 1`" ] && echo ${PORTSDIR} is not empty && exit 1
+	[ ! "`find \"$1\" -type d -empty -maxdepth 1`" ] && echo $1 is not empty && exit 1
 }
 ### Create Repo ###
 if [ "${CREATE_REPO}" -eq "1" ]; then
@@ -435,11 +435,11 @@ buildlist() {
 
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 cd ${PORTSDIR}
-BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
+BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
 else
-[ -n "${SVN_PATCH_FILE}" ] && BUILD_LIST="`(cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//')`"
+[ -n "${SVN_PATCH_FILE}" ] && BUILD_LIST="`(cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/\/files\/$// ; s/\/$//')`"
 [ -n "${GIT_PATCH_FILE}" ] && BUILD_LIST="${BUILD_LIST}
-"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\/// ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/^.*\/.*\/files\/$// ; s/\/$//'`
+"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\/// ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/\/files\/$// ; s/\/$//'`
 BUILD_LIST="`echo "${BUILD_LIST}" | sort | awk '!a[$0]++'`"
 fi
 }
