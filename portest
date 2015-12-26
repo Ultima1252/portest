@@ -183,7 +183,7 @@ fi
 : ${SVN_STATUS_ARGS:="status"}
 : ${SVN_UPDATE_ARGS:="update"}
 : ${GIT:="git"}
-: ${GIT_CLEAN_ARGS:="clean -Xfd -f"}
+: ${GIT_CLEAN_ARGS:="clean -fd -f"}
 : ${GIT_CLONE_ARGS:="clone --depth 1 -b ${BRANCH} ${GIT_REPO_URL}"}
 : ${GIT_RESET_ARGS:="reset --hard"}
 : ${GIT_STATUS_ARGS:="status -s"}
@@ -420,7 +420,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}"
 			${RM} `${SVN} ${SVN_STATUS_ARGS} | awk '{ print $2 }' | grep ".*\.orig"` >/dev/null
 		;;
 		git*)
-			${GIT} ${GIT_CLEAN_ARGS} >/dev/null
+			${GIT} ${GIT_CLEAN_ARGS} -X >/dev/null
 		;;
 		portsnap)
 			cd ${PORTSDIR}
@@ -513,8 +513,9 @@ fi
 	;;
 	git)
 if [ "${REVERT_SOFT}" -eq "1" ] || [ "${REVERT_HARD}" -eq "1" ]; then
-	${GIT} ${GIT_CLEAN_ARGS}
 	${GIT} ${GIT_RESET_ARGS}
+	${GIT} ${GIT_CLEAN_ARGS} -X
+	${GIT} ${GIT_CLEAN_ARGS}
 fi
 	;;
 	portsnap)
