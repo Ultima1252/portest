@@ -319,12 +319,12 @@ if [ -z "${REPO_TYPE}" ] && [ "${PORTSNAP_CHECK}" != "NO" ]; then
 	if [ "${PORTSDIR}" != "/usr/ports" ]; then
 		: ${PORTSNAP_WRKDIR:="${PORTSDIR}/.snap"}
 		: ${PORTSNAP_ARGS:="-d ${PORTSNAP_WRKDIR} -p ${PORTSDIR}"}
+	! [ -d "${PORTSNAP_WRKDIR}" ] && echo "Unsupported repo or portsnap wrkdir not found. Set PORTSNAP_WRKDIR if the latter" && exit 1
 	else
 		: ${PORTSNAP_WRKDIR:=""}
 		: ${PORTSNAP_ARGS:=""}
 	fi
 	REPO_TYPE="portsnap"
-	! [ -d "${PORTSNAP_WRKDIR}" ] && echo "Unsupported repo or portsnap wrkdir not found. Set PORTSNAP_WRKDIR if the latter"
 fi
 
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
@@ -392,9 +392,17 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}"
 		[ -n "${GIT_PATCH_FILE}" ] && PATCHED_FILES="${PATCHED_FILES}
 "`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\///'`
 		mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
-		mkdir -p `echo "${PATCHED_FILES}" | grep -o '^.*\/.*\/' | sort | awk '!a[$0]++'`
-		for file in ${PATCHED_FILES}; do
-			! [ -f "${BACKUPDIR}/$file" ] && cp "${PORTSDIR}/$file" "${BACKUPDIR}/$file"
+		mkdir -p `echo "${PATCHED_FILES}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort | awk '!a[$0]++'`
+		cd ${PORTSDIR}
+		for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
+			! [ -f "${BACKUPDIR}/$file" ] && cp -a "${PORTSDIR}/$file" "${BACKUPDIR}/$file" >/dev/null 2>&1
+		done
+		for dir in `echo "${PATCHED_FILES}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort | awk '!a[$0]++'`; do
+			! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
+		done
+		cd ${PORTSDIR}
+		for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
+			! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
 		done
 	fi
 	for file in ${SVN_PATCH_FILE}; do
@@ -435,11 +443,11 @@ buildlist() {
 
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 cd ${PORTSDIR}
-BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $2 }' | sed 's/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/\/files\/$// ; s/\/$//' | sort | awk '!a[$0]++')`"
+BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $2 }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort | awk '!a[$0]++')`"
 else
-[ -n "${SVN_PATCH_FILE}" ] && BUILD_LIST="`(cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/\/files\/$// ; s/\/$//')`"
+[ -n "${SVN_PATCH_FILE}" ] && BUILD_LIST="`(cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//')`"
 [ -n "${GIT_PATCH_FILE}" ] && BUILD_LIST="${BUILD_LIST}
-"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\/// ; s/^[MTK].*//' | grep -o '^.*\/.*\/' | sed 's/\/files\/$// ; s/\/$//'`
+"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\/// ; s/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//'`
 BUILD_LIST="`echo "${BUILD_LIST}" | sort | awk '!a[$0]++'`"
 fi
 }
@@ -522,9 +530,17 @@ fi
 if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
 	cd ${BACKUPDIR}
-	PATCHED_FILES="`find ./ -type f`"
-	for file in `echo "${PATCHED_FILES}" | sed 's/^\.\///'`; do
-	mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
+	for dir in `find ./ -type d -maxdepth 1 | sed 's/\.\///' | grep '^[A-Z]'`; do
+		rm -rf "${PORTSDIR}/$dir"
+		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
+	done
+	for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
+		rm -rf "${PORTSDIR}/$dir"
+		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
+	done
+	for file in `find ./ -type f -maxdepth 2`; do
+		rm -f "${PORTSDIR}/$file"
+		mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
 	done
 	cd ${PORTSDIR}
 	rm -r ${BACKUPDIR}
