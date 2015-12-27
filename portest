@@ -173,6 +173,7 @@ fi
 : ${PATCH:="patch"}
 : ${PATCH_SVN_ARGS:="-Esf"}
 : ${PATCH_GIT_ARGS:="-Esfp1"}
+: ${PATCH_PATCH_ARGS:="-Esf"}
 : ${PORTSNAP:="portsnap"}
 : ${PORTSNAP_FETCH_ARGS:="fetch"}
 : ${PORTSNAP_EXTRACT_ARGS:="extract"}
@@ -183,6 +184,7 @@ fi
 : ${SVN_STATUS_ARGS:="status"}
 : ${SVN_UPDATE_ARGS:="update"}
 : ${GIT:="git"}
+: ${GIT_ADD_ARGS:="add -AN"}
 : ${GIT_CLEAN_ARGS:="clean -fd -f"}
 : ${GIT_CLONE_ARGS:="clone --depth 1 -b ${BRANCH} ${GIT_REPO_URL}"}
 : ${GIT_RESET_ARGS:="reset --hard"}
@@ -353,8 +355,10 @@ for file in ${PATCH_FILE}; do
 		SVN_PATCH_FILE="${SVN_PATCH_FILE} $file"
 	elif [ "diff --git" == "`head -4 \"$file\" | grep -m 1 -o \"^diff \-\-git\"`" ]; then
 		GIT_PATCH_FILE="${GIT_PATCH_FILE} $file"
+	elif [ "diff" == "`head -4 \"$file\" | grep -m 1 -o \"^diff\"`" ]; then
+		PATCH_PATCH_FILE="${PATCH_PATCH_FILE} $file"
 	else
-		echo "$file is not a svn or git patchfile"
+		echo "$file is not a recognized patch format"
 		exit 1
 	fi
 done
@@ -385,19 +389,25 @@ cd ${PORTSDIR}
 	esac
 fi
 
+filelist() {
+[ -n "${SVN_PATCH_FILE}" ] && PATCH_FILES_LIST="`cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $2 }'`"
+[ -n "${GIT_PATCH_FILE}" ] && PATCH_FILES_LIST="${PATCH_FILES_LIST}
+"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\///'`
+[ -n "${PATCH_PATCH_FILE}" ] && PATCH_FILES_LIST="${PATCH_FILES_LIST}
+"`cat ${PATCH_PATCH_FILE} | grep "^diff" | awk '{print $(NF)}'`
+}
+
 ### Patch Tree ###
 if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	if [ "${REPO_TYPE}" == "portsnap" ]; then
-		[ -n "${SVN_PATCH_FILE}" ] && PATCHED_FILES="`cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $2 }'`"
-		[ -n "${GIT_PATCH_FILE}" ] && PATCHED_FILES="${PATCHED_FILES}
-"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\///'`
+		[ -z "${PATCH_FILES_LIST}" ] && filelist
 		mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
-		mkdir -p `echo "${PATCHED_FILES}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort | awk '!a[$0]++'`
+		mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort | awk '!a[$0]++'`
 		cd ${PORTSDIR}
 		for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
 			! [ -f "${BACKUPDIR}/$file" ] && cp -a "${PORTSDIR}/$file" "${BACKUPDIR}/$file" >/dev/null 2>&1
 		done
-		for dir in `echo "${PATCHED_FILES}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort | awk '!a[$0]++'`; do
+		for dir in `echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort | awk '!a[$0]++'`; do
 			! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
 		done
 		cd ${PORTSDIR}
@@ -412,6 +422,10 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}"
 	for file in ${GIT_PATCH_FILE}; do
 	PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_GIT_ARGS} -d "${PORTSDIR}" -i "$file"`
+	done
+	for file in ${PATCH_PATCH_FILE}; do
+	PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
 	done
 		for file in `echo "${PATCH_OUTPUT}" | awk '{print $(NF)}'`; do
 			echo "$file"
@@ -429,6 +443,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}"
 		;;
 		git*)
 			${GIT} ${GIT_CLEAN_ARGS} -X >/dev/null
+			${GIT} ${GIT_ADD_ARGS}
 		;;
 		portsnap)
 			cd ${PORTSDIR}
@@ -448,6 +463,8 @@ else
 [ -n "${SVN_PATCH_FILE}" ] && BUILD_LIST="`(cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | sed 's/^Index: // ; s/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//')`"
 [ -n "${GIT_PATCH_FILE}" ] && BUILD_LIST="${BUILD_LIST}
 "`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\/// ; s/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//'`
+[ -n "${PATCH_PATCH_FILE}" ] && BUILD_LIST="${BUILD_LIST}
+"`cat ${PATCH_PATCH_FILE} | grep "^diff" | awk '{print $(NF)}' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//'`
 BUILD_LIST="`echo "${BUILD_LIST}" | sort | awk '!a[$0]++'`"
 fi
 }
@@ -497,9 +514,7 @@ case ${REPO_TYPE} in
 if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 # Generate a list of files that were patched #
-	[ -n "${SVN_PATCH_FILE}" ] && PATCH_FILES_LIST="`cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $2 }'`"
-	[ -n "${GIT_PATCH_FILE}" ] && PATCH_FILES_LIST="${PATCH_FILES_LIST}
-"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\///'`
+	[ -z "${PATCH_FILES_LIST}" ] && filelist
 # Wierd cases where svn won't see short filenames in list.    #
 # This seems to be an svn bug, this list helps in those cases #
 	PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[a-z].*\/.*\/.*'`"
@@ -531,24 +546,24 @@ if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
 	cd ${BACKUPDIR}
 	for dir in `find ./ -type d -maxdepth 1 | sed 's/\.\///' | grep '^[A-Z]'`; do
-		rm -rf "${PORTSDIR}/$dir"
+		${RM} ${RM_ARGS} "${PORTSDIR}/$dir"
 		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
 	done
 	for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
-		rm -rf "${PORTSDIR}/$dir"
+		${RM} -rf "${PORTSDIR}/$dir"
 		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
 	done
 	for file in `find ./ -type f -maxdepth 2`; do
-		rm -f "${PORTSDIR}/$file"
+		${RM} -f "${PORTSDIR}/$file"
 		mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
 	done
 	cd ${PORTSDIR}
-	rm -r ${BACKUPDIR}
-	rm `find ./ -maxdepth 4 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+	${RM} -r ${BACKUPDIR}
+	${RM} `find ./ -maxdepth 4 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
 elif [ "${REVERT_HARD}"  -eq "1" ]; then
 	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
 	cd ${PORTSDIR}
-	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+	${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
 fi
 	;;
 esac
