@@ -404,14 +404,13 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}"
 		mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
 		mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort | awk '!a[$0]++'`
 		cd ${PORTSDIR}
+		for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
+			! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
+		done
 		for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
 			! [ -f "${BACKUPDIR}/$file" ] && cp -a "${PORTSDIR}/$file" "${BACKUPDIR}/$file" >/dev/null 2>&1
 		done
 		for dir in `echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort | awk '!a[$0]++'`; do
-			! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
-		done
-		cd ${PORTSDIR}
-		for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
 			! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
 		done
 	fi
@@ -489,7 +488,7 @@ fi
 
 ### Port test and Poudriere testing ###
 if [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
-	${RM} ${RM_ARGS} "`find ${PORTSDIR} -type directory -name "work" -maxdepth 3`"
+	${RM} ${RM_ARGS} "`find ${PORTSDIR} -type d -name "work" -maxdepth 3`"
 	[ -z "${BUILD_LIST}" ] && buildlist
 	for port in ${BUILD_LIST}; do
 		cd "${PORTSDIR}/$port"
@@ -509,8 +508,6 @@ case ${REPO_TYPE} in
 	svn)
 if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
-# Generate a list of files that were patched #
-	[ -z "${PATCH_FILES_LIST}" ] && filelist
 # Wierd cases where svn won't see short filenames in list.    #
 # This seems to be an svn bug, this list helps in those cases #
 	PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[a-z].*\/.*\/.*'`"
