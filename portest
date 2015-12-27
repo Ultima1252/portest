@@ -30,22 +30,29 @@ PORTEST_VERSION="0.0.7"
 
 usage() {
 	cat << EOF
-Usage: portest [-m git] [-f bulkfile] [-U default2] [-d PORTSDIR] [-abcdpPrRtTUv] \\
+Usage: portest [-m git] [-f bulkfile] [-U default2] [-d PORTSDIR] [-abcdpPrRtTuv] \\
                file.diff file2.diff ...
 
 Parameters:
     -a     --  Do everything except revert and port test (-ptf build.ports.txt)
-    -c     --  Create repo, see -m for supported protocols
+    -c     --  Create repo, see -m for supported protocols, default is git
     -f     --  Generate a poudiere usable bulk file
     -p     --  Patch, will exit on fail with output
+               portsnap will create a backup directory
+               which is used on soft reverts (-r) and updates (-u)
     -P     --  Patch, do not exit on failed patch
-    -r     --  Revert the files listed in patchfile, fast
-    -R     --  Revert modifications according tree, slow but will 
-               guarantee tree integrity (git always uses this method)
+    -r     --  Soft Revert, quick and effective
+               portsnap uses backup created when patch (-p, -P) is used, fast
+               git (-r) is same as (-R) see below
+               svn reverts all files from input patchfiles, fast
+    -R     --  Hard Revert, portsnap will rebuild tree, very slow
+               git does hard reset and cleans all files, fast
+               svn removed all files via status and revert -R, very slow!!
     -t     --  Test with portlint
     -T     --  Test with port test, or poudriere depending on
                USE_POUDRIERE
-    -u     --  Update repo
+    -u     --  Update repo, git will stash and stash pop on updates
+               portsnap do a soft revert if a backup directory exists
     -v     --  Show version of portest then exit
 Options:
     -b     --  Generate the list of cat/ports based on port tree
@@ -412,11 +419,11 @@ cd ${PORTSDIR}
 fi
 
 filelist() {
-[ -n "${SVN_PATCH_FILE}" ] && PATCH_FILES_LIST="`cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $2 }'`"
+[ -n "${SVN_PATCH_FILE}" ] && PATCH_FILES_LIST="`cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $(NF) }'`"
 [ -n "${GIT_PATCH_FILE}" ] && PATCH_FILES_LIST="${PATCH_FILES_LIST}
-"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{print $(NF)}' | sed 's/^b\///'`
+"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{ print $(NF) }' | sed 's/^b\///'`
 [ -n "${PATCH_PATCH_FILE}" ] && PATCH_FILES_LIST="${PATCH_FILES_LIST}
-"`cat ${PATCH_PATCH_FILE} | grep "^diff" | awk '{print $(NF)}'`
+"`cat ${PATCH_PATCH_FILE} | grep "^diff" | awk '{ print $(NF) }'`
 }
 folderlist() {
 [ -z "${PATCH_FILES_LIST}" ] && filelist
@@ -462,7 +469,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}"
 	PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
 	done
-		for file in `echo "${PATCH_OUTPUT}" | awk '{print $(NF)}'`; do
+		for file in `echo "${PATCH_OUTPUT}" | awk '{ print $(NF) }'`; do
 			echo "$file"
 			cat "${PORTSDIR}/$file"
 		done
@@ -482,7 +489,7 @@ buildlist() {
 
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 cd ${PORTSDIR}
-BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $2 }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort | awk '!a[$0]++')`"
+BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort | awk '!a[$0]++')`"
 else
 [ -z "${PATCH_FILES_LIST}" ] && filelist
 BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort | awk '!a[$0]++'`"
@@ -546,7 +553,8 @@ if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	[ -n "${PATCH_FILES_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
 	[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
 elif [ "${REVERT_HARD}"  -eq "1" ]; then
-	for file in `${SVN} status | awk '{ print $2 }'`; do
+	cd ${PORTSDIR}
+	for file in `${SVN} status | awk '{ print $(NF) }'`; do
 		${RM} ${RM_ARGS} "${PORTSDIR}/$file"
 	done
 	${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
