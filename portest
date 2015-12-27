@@ -510,7 +510,7 @@ if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 # Wierd cases where svn won't see short filenames in list.    #
 # This seems to be an svn bug, this list helps in those cases #
-	PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[a-z].*\/.*\/.*'`"
+	PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[^/]*\/[^/]*\/[^/]*'`"
 	for file in ${BUILD_LIST}; do
 		${RM} ${RM_ARGS} "${PORTSDIR}/$file"
 	done
@@ -543,10 +543,10 @@ if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
 	done
 	for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
-		${RM} -rf "${PORTSDIR}/$dir"
+		${RM} ${RM_ARGS} "${PORTSDIR}/$dir"
 		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
 	done
-	for file in `find ./ -type f -maxdepth 2`; do
+	for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
 		${RM} -f "${PORTSDIR}/$file"
 		mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
 	done
