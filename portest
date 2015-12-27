@@ -372,6 +372,25 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 	done
 fi
 
+portsnap_soft_revert() {
+cd ${BACKUPDIR}
+for dir in `find ./ -type d -maxdepth 1 | sed 's/\.\///' | grep '^[A-Z]'`; do
+	${RM} ${RM_ARGS} "${PORTSDIR}/$dir"
+	mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
+done
+	for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
+	${RM} ${RM_ARGS} "${PORTSDIR}/$dir"
+	mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
+done
+for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
+	${RM} -f "${PORTSDIR}/$file"
+	mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
+done
+cd ${PORTSDIR}
+${RM} -r ${BACKUPDIR}
+${RM} `find ./ -maxdepth 2 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+}
+
 ### Update Repo ###
 if [ "${UPDATE_REPO}" -eq "1" ]; then
 cd ${PORTSDIR}
@@ -385,6 +404,7 @@ cd ${PORTSDIR}
 			${GIT} ${GIT_STASHPOP_ARGS}
 		;;
 		portsnap)
+			[ -d "${BACKUPDIR}" ] && portsnap_soft_revert
 			${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_UPDATE_ARGS}
 	esac
 fi
@@ -537,22 +557,7 @@ fi
 	portsnap)
 if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
-	cd ${BACKUPDIR}
-	for dir in `find ./ -type d -maxdepth 1 | sed 's/\.\///' | grep '^[A-Z]'`; do
-		${RM} ${RM_ARGS} "${PORTSDIR}/$dir"
-		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
-	done
-	for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
-		${RM} ${RM_ARGS} "${PORTSDIR}/$dir"
-		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
-	done
-	for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
-		${RM} -f "${PORTSDIR}/$file"
-		mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
-	done
-	cd ${PORTSDIR}
-	${RM} -r ${BACKUPDIR}
-	${RM} `find ./ -maxdepth 4 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+	portsnap_soft_revert
 elif [ "${REVERT_HARD}"  -eq "1" ]; then
 	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
 	cd ${PORTSDIR}
