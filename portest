@@ -30,7 +30,7 @@ PORTEST_VERSION="0.0.8"
 
 usage() {
 	cat << EOF
-Usage: portest [-m git] [-f bulkfile] [-U default2] [-d PORTSDIR] [-abcdpPrRtTuv] \\
+Usage: portest [-m git] [-f bulkfile] [-U default2] [-d PORTSDIR] [-abcdprRtTuv] \\
                file.diff file2.diff ...
 
 Parameters:
@@ -40,7 +40,6 @@ Parameters:
     -p     --  Patch, will exit on fail with output
                portsnap will create a backup directory
                which is used on soft reverts (-r) and updates (-u)
-    -P     --  Patch, do not exit on failed patch
     -r     --  Soft Revert, quick and effective
                portsnap uses backup created when patch (-p, -P) is used, fast
                git (-r) is same as (-R) see below
@@ -74,7 +73,6 @@ EOF
 ALL="0"
 POUDRIERE_BULK="0"
 DO_PATCH="0"
-PATCH_FAILED_EXIT="0"
 REVERT_SOFT="0"
 REVERT_HARD="0"
 TEST_PORTLINT="0"
@@ -83,7 +81,7 @@ REPO_BUILD_LIST="0"
 CREATE_REPO="0"
 UPDATE_REPO="0"
 
-while getopts ":abcd:j:f:m:pPrRtTuU:v" FLAG; do
+while getopts ":abcd:j:f:m:prRtTuU:v" FLAG; do
 	case "${FLAG}" in
 	a)
 		ALL="1"
@@ -109,9 +107,6 @@ while getopts ":abcd:j:f:m:pPrRtTuU:v" FLAG; do
 		;;
 	p)
 		DO_PATCH="1"
-		;;
-	P)
-		PATCH_FAILED_EXIT="1"
 		;;
 	r)
 		REVERT_SOFT="1"
@@ -143,8 +138,8 @@ done
 shift "$((OPTIND-1))"
 
 if [ ${REPO_BUILD_LIST} -ne 1 ]; then
-[ $(( ALL + POUDRIERE_BULK + DO_PATCH + PATCH_FAILED_EXIT + REVERT_SOFT + TEST_PORTLINT + TEST_BUILD )) -ge 1 ] && [ $# -lt 1 ] && usage
-elif [ $(( DO_PATCH + PATCH_FAILED_EXIT )) -ge 1 ] && [ $# -lt 1 ]; then
+[ $(( ALL + POUDRIERE_BULK + DO_PATCH + REVERT_SOFT + TEST_PORTLINT + TEST_BUILD )) -ge 1 ] && [ $# -lt 1 ] && usage
+elif [ $(( DO_PATCH )) -ge 1 ] && [ $# -lt 1 ]; then
 	usage;
 fi
 
@@ -434,8 +429,9 @@ folderlist() {
 }
 
 ### Patch Tree ###
-if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
+if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	[ -z "${PATCH_FOLDER_LIST}" ] && folderlist
+	echo ${PATCH_FOLDER_LIST}
 	if [ "${REPO_TYPE}" == "portsnap" ]; then
 		mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
 		mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort | awk '!a[$0]++'`
@@ -474,16 +470,13 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}"
 			cat "${PORTSDIR}/$file"
 		done
 		
-	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ] && [ "${PATCH_FAILED_EXIT}" -ne "1" ]; then
+	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ]; then
 		echo "${PATCH_OUTPUT}"
 		echo "Patch Failed"
 		exit 1
 	else
-	case ${REPO_TYPE} in
-		git)	${GIT} ${GIT_CLEAN_ARGS} -X >/dev/null 2>&1 ;;
-		*)	cd ${PORTSDIR}
-			${RM} `find ./ -maxdepth 4 -name "*.orig"` ;;
-		esac
+		cd ${PORTSDIR}
+		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"`
 	fi
 fi
 
@@ -532,9 +525,14 @@ if [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	done
 elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
+	TMUX=1
 	for jail in ${POUDRIERE_JAILS}; do
-		${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
+		[ -n "${TMUX}" ] && tmux new-session -ds portest ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
+		! [ -n "${TMUX}" ] && tmux split-window -dt portest  ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
+		[ -n "${TMUX}" ] && unset TMUX
 	done
+	tmux select-layout -t portest tiled
+	tmux attach -t portest
 fi
 
 ### Revert Patch ###
