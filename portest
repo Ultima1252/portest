@@ -479,8 +479,11 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${PATCH_FAILED_EXIT}" -eq "1" ] || [ "${ALL}"
 		echo "Patch Failed"
 		exit 1
 	else
-			cd ${PORTSDIR}
-			${RM} `find ./ -maxdepth 4 -name "*.orig"`
+	case ${REPO_TYPE} in
+		git)	${GIT} ${GIT_CLEAN_ARGS} -X >/dev/null 2>&1 ;;
+		*)	cd ${PORTSDIR}
+			${RM} `find ./ -maxdepth 4 -name "*.orig"` ;;
+		esac
 	fi
 fi
 
@@ -552,12 +555,14 @@ if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	[ -n "${BUILD_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${BUILD_LIST}
 	[ -n "${PATCH_FILES_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
 	[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
+	${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
 elif [ "${REVERT_HARD}"  -eq "1" ]; then
 	cd ${PORTSDIR}
 	for file in `${SVN} status | awk '{ print $(NF) }'`; do
 		${RM} ${RM_ARGS} "${PORTSDIR}/$file"
 	done
 	${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
+	${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
 fi
 	;;
 	git)
