@@ -366,7 +366,7 @@ done
 
 # Check for valid jails #
 if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
-	[ -z "${POUDRIERE_JAILS}" ] && echo "no jails selected use -j or export POUDRIERE_JAILS=\"jail1 jail2\""
+	[ -z "${POUDRIERE_JAILS}" ] && echo "no jails selected use -j or export POUDRIERE_JAILS=\"jail1 jail2\"" && exit 1
 	for jail in ${POUDRIERE_JAILS}; do
 	${POUDRIERE} jail -i -j $jail >/dev/null 2>&1
 	[ $? -ne 0 ] && echo "No such jail $jail" && exit 1
@@ -524,14 +524,18 @@ if [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	done
 elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
-	TMUX=1
+	TMUX_OPEN=1
+	TMUX_SESSION="portest-`openssl rand -hex 64`"
 	for jail in ${POUDRIERE_JAILS}; do
-		[ -n "${TMUX}" ] && tmux new-session -ds portest ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
-		! [ -n "${TMUX}" ] && tmux split-window -dt portest  ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
-		[ -n "${TMUX}" ] && unset TMUX
+		[ -n "${TMUX_OPEN}" ] && tmux new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
+		! [ -n "${TMUX_OPEN}" ] && tmux split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
+		[ -n "${TMUX_OPEN}" ] && unset TMUX_OPEN
 	done
-	tmux select-layout -t portest tiled
-	tmux attach -t portest
+	tmux select-layout -t "${TMUX_SESSION}" tiled
+	tmux attach-session -t "${TMUX_SESSION}" >/dev/null 2>&1
+	if [ "$?" -ne 0 ]; then
+		tmux switch -t "${TMUX_SESSION}"
+	fi
 fi
 
 ### Revert Patch ###
