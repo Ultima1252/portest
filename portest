@@ -431,7 +431,6 @@ folderlist() {
 ### Patch Tree ###
 if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	[ -z "${PATCH_FOLDER_LIST}" ] && folderlist
-	echo ${PATCH_FOLDER_LIST}
 	if [ "${REPO_TYPE}" == "portsnap" ]; then
 		mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
 		mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort | awk '!a[$0]++'`
