@@ -182,6 +182,7 @@ fi
 : ${PORTSNAP_UPDATE_ARGS:="update"}
 : ${SVN:="svn"}
 : ${SVN_CHECKOUT_ARGS:="checkout ${SVN_REPO_URL}"}
+: ${SVN_PATCH_ARGS:="patch"}
 : ${SVN_REVERT_ARGS:="revert -R"}
 : ${SVN_STATUS_ARGS:="status"}
 : ${SVN_UPDATE_ARGS:="update"}
@@ -445,51 +446,63 @@ folderlist() {
 ### Patch Tree ###
 if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	[ -z "${PATCH_FOLDER_LIST}" ] && folderlist
-	if [ "${REPO_TYPE}" == "portsnap" ]; then
-		mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
-		mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort -u`
-		cd ${PORTSDIR}
-		for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
-			! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
+	case ${REPO_TYPE} in
+	portsnap*)	mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
+			mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort -u`
+			cd ${PORTSDIR}
+			for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
+				! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
+			done
+			for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
+				! [ -f "${BACKUPDIR}/$file" ] && cp -a "${PORTSDIR}/$file" "${BACKUPDIR}/$file" >/dev/null 2>&1
+			done
+			for dir in `echo "${PATCH_FOLDER_LIST}"`; do
+				! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
+			done
+			for dir in `echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u`; do
+				! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
+			done ;;
+	git*)		for dir in `echo "${PATCH_FOLDER_LIST}"`; do
+				! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
+			done ;;
+	svn*)	;;
+	esac
+	case ${REPO_TYPE} in
+	svn*)	for file in ${SVN_PATCH_FILE}; do
+		PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${SVN} ${SVN_PATCH_ARGS} "$file" "${PORTSDIR}"`
 		done
-		for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
-			! [ -f "${BACKUPDIR}/$file" ] && cp -a "${PORTSDIR}/$file" "${BACKUPDIR}/$file" >/dev/null 2>&1
+		for file in ${GIT_PATCH_FILE}; do
+		PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${SVN} ${SVN_PATCH_ARGS} "$file" "${PORTSDIR}"`
 		done
-		for dir in `echo "${PATCH_FOLDER_LIST}"`; do
-			! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
-		done
-		for dir in `echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u`; do
-			! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
-		done
-	else
-		for dir in `echo "${PATCH_FOLDER_LIST}"`; do
-			! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
-		done
-	fi
-	for file in ${SVN_PATCH_FILE}; do
-	PATCH_OUTPUT="${PATCH_OUTPUT}
+		for file in ${PATCH_PATCH_FILE}; do
+		PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${SVN} ${SVN_PATCH_ARGS} "$file" "${PORTSDIR}"`
+		done ;;
+	*)	for file in ${SVN_PATCH_FILE}; do 
+		PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_SVN_ARGS} -d "${PORTSDIR}" -i "$file"`
-	done
-	for file in ${GIT_PATCH_FILE}; do
-	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${PATCH} ${PATCH_GIT_ARGS} -d "${PORTSDIR}" -i "$file"`
-	done
-	for file in ${PATCH_PATCH_FILE}; do
-	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
-	done
-		for file in `echo "${PATCH_OUTPUT}" | awk '{ print $(NF) }'`; do
-			echo "$file"
-			cat "${PORTSDIR}/$file"
 		done
-		
+		for file in ${GIT_PATCH_FILE}; do
+		PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${PATCH} ${PATCH_GIT_ARGS} -d "${PORTSDIR}" -i "$file"`
+		done
+		for file in ${PATCH_PATCH_FILE}; do
+		PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
+		done ;;
+	esac
 	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ]; then
 		echo "${PATCH_OUTPUT}"
 		echo "Patch Failed"
 		exit 1
 	else
-		cd ${PORTSDIR}
-		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"`
+		case ${REPO_TYPE} in
+		svn*);;
+		*)	cd ${PORTSDIR}
+			${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` ;;
+		esac
 	fi
 fi
 
@@ -498,7 +511,7 @@ buildlist() {
 
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 cd ${PORTSDIR}
-BUILD_LIST="`(${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u)`"
+BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u`"
 else
 [ -z "${PATCH_FILES_LIST}" ] && filelist
 BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u`"
