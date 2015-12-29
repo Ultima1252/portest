@@ -187,8 +187,11 @@ fi
 : ${SVN_STATUS_ARGS:="status"}
 : ${SVN_UPDATE_ARGS:="update"}
 : ${GIT:="git"}
+: ${GIT_ADD_ARGS:="add -AN"}
 : ${GIT_CLEAN_ARGS:="clean -fd -f"}
 : ${GIT_CLONE_ARGS:="clone --depth 1 -b ${BRANCH} ${GIT_REPO_URL}"}
+: ${GIT_GIT_PATCH_ARGS:="apply --whitespace=nowarn"}
+: ${GIT_PATCH_ARGS:="apply -p0 --whitespace=nowarn"}
 : ${GIT_RESET_ARGS:="reset --hard"}
 : ${GIT_STATUS_ARGS:="status -s"}
 : ${GIT_UPDATE_ARGS:="pull"}
@@ -479,7 +482,34 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		for file in ${PATCH_PATCH_FILE}; do
 		PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${SVN} ${SVN_PATCH_ARGS} "$file" "${PORTSDIR}"`
-		done ;;
+		done 
+		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o reject`" == "reject" ]; then
+			echo "${PATCH_OUTPUT}"
+			echo "Patch Failed"
+			exit 1
+		fi ;;
+	git*)	cd ${PORTSDIR}
+		for file in ${SVN_PATCH_FILE}; do
+		PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${GIT} ${GIT_PATCH_ARGS} "$file" 2>&1`
+		done
+		for file in ${GIT_PATCH_FILE}; do
+		PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${GIT} ${GIT_GIT_PATCH_ARGS} "$file" 2>&1`
+		done
+		for file in ${PATCH_PATCH_FILE}; do
+		PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${GIT} ${GIT_PATCH_ARGS} "$file" 2>&1`
+		done
+		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o error`" == "error" ]; then
+			echo "${PATCH_OUTPUT}"
+			echo "Patch Failed"
+			exit 1
+		fi
+		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
+		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty`
+;;
+
 	*)	for file in ${SVN_PATCH_FILE}; do 
 		PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_SVN_ARGS} -d "${PORTSDIR}" -i "$file"`
@@ -491,19 +521,15 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		for file in ${PATCH_PATCH_FILE}; do
 		PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
-		done ;;
+		done
+		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ]; then
+			echo "${PATCH_OUTPUT}"
+			echo "Patch Failed"
+			exit 1
+		fi
+		cd ${PORTSDIR}
+		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` ;;
 	esac
-	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o reject`" == "reject" ]; then
-		echo "${PATCH_OUTPUT}"
-		echo "Patch Failed"
-		exit 1
-	else
-		case ${REPO_TYPE} in
-		svn*);;
-		*)	cd ${PORTSDIR}
-			${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` ;;
-		esac
-	fi
 fi
 
 # Generate a list of ports for poudriere to build #
