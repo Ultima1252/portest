@@ -467,6 +467,9 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 			done ;;
 	git*)		for dir in `echo "${PATCH_FOLDER_LIST}"`; do
 				! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
+			done
+			for file in `echo "${PATCH_FILES_LIST}"`; do
+				! [ -f "${PORTSDIR}/$file" ] && touch "${PORTSDIR}/$file"
 			done ;;
 	svn*)	;;
 	esac
@@ -507,7 +510,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 			exit 1
 		fi
 		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
-		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty`
+		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` >/dev/null 2>&1
 ;;
 
 	*)	for file in ${SVN_PATCH_FILE}; do 
