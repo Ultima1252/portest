@@ -493,7 +493,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 "`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
 		done ;;
 	esac
-	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ]; then
+	if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o reject`" == "reject" ]; then
 		echo "${PATCH_OUTPUT}"
 		echo "Patch Failed"
 		exit 1
