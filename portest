@@ -191,8 +191,6 @@ fi
 : ${GIT_RESET_ARGS:="reset --hard"}
 : ${GIT_STATUS_ARGS:="status -s"}
 : ${GIT_UPDATE_ARGS:="pull"}
-: ${GIT_STASH_ARGS:="stash"}
-: ${GIT_STASHPOP_ARGS:="stash pop"}
 : ${RM:="rm"}
 : ${RM_ARGS:="-rf"}
 : ${PORTLINT:="portlint"}
@@ -374,6 +372,12 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 	done
 fi
 
+git_revert() {
+${GIT} ${GIT_RESET_ARGS}
+${GIT} ${GIT_CLEAN_ARGS} -X
+${GIT} ${GIT_CLEAN_ARGS}
+}
+
 portsnap_soft_revert() {
 cd ${BACKUPDIR}
 for dir in `find ./ -type d -maxdepth 1 | sed 's/\.\///' | grep '^[A-Z]'`; do
@@ -396,17 +400,26 @@ ${RM} -r "${BACKUPDIR}"
 ${RM} `find ./ -maxdepth 2 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
 }
 
+svn_hard_revert() {
+cd ${PORTSDIR}
+for file in `${SVN} status | awk '{ print $(NF) }'`; do
+	${RM} ${RM_ARGS} "${PORTSDIR}/$file"
+done
+${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
+${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+}
+
 ### Update Repo ###
 if [ "${UPDATE_REPO}" -eq "1" ]; then
 cd ${PORTSDIR}
 	case ${REPO_TYPE} in
 		svn)
+			svn_hard_revert
 			${SVN} ${SVN_UPDATE_ARGS}
 		;;
 		git)
-			${GIT} ${GIT_STASH_ARGS}
+			git_revert
 			${GIT} ${GIT_UPDATE_ARGS}
-			${GIT} ${GIT_STASHPOP_ARGS}
 		;;
 		portsnap)
 			[ -d "${BACKUPDIR}" ] && portsnap_soft_revert
@@ -559,19 +572,12 @@ if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
 	[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
 	${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
 elif [ "${REVERT_HARD}"  -eq "1" ]; then
-	cd ${PORTSDIR}
-	for file in `${SVN} status | awk '{ print $(NF) }'`; do
-		${RM} ${RM_ARGS} "${PORTSDIR}/$file"
-	done
-	${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
-	${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+	svn_hard_revert
 fi
 	;;
 	git)
 if [ "${REVERT_SOFT}" -eq "1" ] || [ "${REVERT_HARD}" -eq "1" ]; then
-	${GIT} ${GIT_RESET_ARGS}
-	${GIT} ${GIT_CLEAN_ARGS} -X
-	${GIT} ${GIT_CLEAN_ARGS}
+	git_revert
 fi
 	;;
 	portsnap)
