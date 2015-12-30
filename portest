@@ -166,7 +166,7 @@ if [ "${CREATE_REPO}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	esac
 
 	case ${METHOD} in
-	git*) : ${BRANCH:="master"};;
+	git*) : ${BRANCH:="master"} ;;
 	svn*) : ${BRANCH:="head"} ;;
 	esac
 
@@ -482,17 +482,17 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	esac
 	case ${REPO_TYPE} in
 	svn*)	for file in ${SVN_PATCH_FILE}; do
-		PATCH_OUTPUT="${PATCH_OUTPUT}
+			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${SVN} ${SVN_PATCH_ARGS} "$file" "${PORTSDIR}"`
-		done
+			done
 		for file in ${GIT_PATCH_FILE}; do
-		PATCH_OUTPUT="${PATCH_OUTPUT}
+			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${SVN} ${SVN_PATCH_ARGS} "$file" "${PORTSDIR}"`
-		done
+			done
 		for file in ${PATCH_PATCH_FILE}; do
-		PATCH_OUTPUT="${PATCH_OUTPUT}
+			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${SVN} ${SVN_PATCH_ARGS} "$file" "${PORTSDIR}"`
-		done 
+			done 
 		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o reject`" == "reject" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
@@ -501,17 +501,17 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*';;
 	git*)	cd ${PORTSDIR}
 		for file in ${SVN_PATCH_FILE}; do
-		PATCH_OUTPUT="${PATCH_OUTPUT}
+			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${GIT} ${GIT_PATCH_ARGS} "$file" 2>&1`
-		done
+			done
 		for file in ${GIT_PATCH_FILE}; do
-		PATCH_OUTPUT="${PATCH_OUTPUT}
+			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${GIT} ${GIT_GIT_PATCH_ARGS} "$file" 2>&1`
-		done
+			done
 		for file in ${PATCH_PATCH_FILE}; do
-		PATCH_OUTPUT="${PATCH_OUTPUT}
+			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${GIT} ${GIT_PATCH_ARGS} "$file" 2>&1`
-		done
+			done
 		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o error`" == "error" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
@@ -523,17 +523,17 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 ;;
 
 	*)	for file in ${SVN_PATCH_FILE}; do 
-		PATCH_OUTPUT="${PATCH_OUTPUT}
+			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_SVN_ARGS} -d "${PORTSDIR}" -i "$file"`
-		done
+			done
 		for file in ${GIT_PATCH_FILE}; do
-		PATCH_OUTPUT="${PATCH_OUTPUT}
+			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_GIT_ARGS} -d "${PORTSDIR}" -i "$file"`
-		done
+			done
 		for file in ${PATCH_PATCH_FILE}; do
-		PATCH_OUTPUT="${PATCH_OUTPUT}
+			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
-		done
+			done
 		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
