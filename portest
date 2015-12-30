@@ -487,10 +487,11 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 "`${SVN} ${SVN_PATCH_ARGS} "$file" "${PORTSDIR}"`
 		done 
 		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o reject`" == "reject" ]; then
-			echo "${PATCH_OUTPUT}"
+			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
-		fi ;;
+		fi
+		echo "${PATCH_OUTPUT}" | grep '^[^ ].*';;
 	git*)	cd ${PORTSDIR}
 		for file in ${SVN_PATCH_FILE}; do
 		PATCH_OUTPUT="${PATCH_OUTPUT}
@@ -505,10 +506,11 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 "`${GIT} ${GIT_PATCH_ARGS} "$file" 2>&1`
 		done
 		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o error`" == "error" ]; then
-			echo "${PATCH_OUTPUT}"
+			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
 		fi
+		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
 		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` >/dev/null 2>&1
 ;;
@@ -526,10 +528,11 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 "`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
 		done
 		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ]; then
-			echo "${PATCH_OUTPUT}"
+			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
 		fi
+		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		cd ${PORTSDIR}
 		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` ;;
 	esac
