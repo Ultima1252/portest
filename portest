@@ -41,7 +41,7 @@ Parameters:
                portsnap will create a backup directory
                which is used on soft reverts (-r) and updates (-u)
     -r     --  Soft Revert, quick and effective
-               portsnap uses backup created when patch (-p, -P) is used, fast
+               portsnap uses backup created when patch (-p) is used, fast
                git (-r) is same as (-R) see below
                svn reverts all files from input patchfiles, fast
     -R     --  Hard Revert, portsnap will rebuild tree, very slow
@@ -50,7 +50,7 @@ Parameters:
     -t     --  Test with portlint
     -T     --  Test with port test, or poudriere depending on
                USE_POUDRIERE
-    -u     --  Update repo, git will stash and stash pop on updates
+    -u     --  Update repo, git and svn will do a hard revert (-R) first
                portsnap do a soft revert if a backup directory exists
     -v     --  Show version of portest then exit
 Options:
