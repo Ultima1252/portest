@@ -130,6 +130,11 @@ while getopts ":abcd:j:f:m:prRtTuU:v" FLAG; do
 	v)
 		echo "${PORTEST_VERSION}"
 		exit 0
+		;;
+	*)
+		usage
+		exit 1
+		;;
 	esac
 done
 
@@ -195,6 +200,8 @@ fi
 : ${GIT_RESET_ARGS:="reset --hard"}
 : ${GIT_STATUS_ARGS:="status -s"}
 : ${GIT_UPDATE_ARGS:="pull"}
+: ${TMUX_COMMAND:="tmux"}
+: ${TMUX_LAYOUT:="tiled"}
 : ${RM:="rm"}
 : ${RM_ARGS:="-rf"}
 : ${PORTLINT:="portlint"}
@@ -586,14 +593,14 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	TMUX_OPEN=1
 	TMUX_SESSION="portest-`openssl rand -hex 64`"
 	for jail in ${POUDRIERE_JAILS}; do
-		[ -n "${TMUX_OPEN}" ] && tmux new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
-		! [ -n "${TMUX_OPEN}" ] && tmux split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
+		[ -n "${TMUX_OPEN}" ] && ${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
+		! [ -n "${TMUX_OPEN}" ] && ${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
 		[ -n "${TMUX_OPEN}" ] && unset TMUX_OPEN
 	done
-	tmux select-layout -t "${TMUX_SESSION}" tiled
-	tmux attach-session -t "${TMUX_SESSION}" >/dev/null 2>&1
+	${TMUX_COMMAND} select-layout -t "${TMUX_SESSION}" ${TMUX_LAYOUT}
+	${TMUX_COMMAND} attach-session -t "${TMUX_SESSION}" >/dev/null 2>&1
 	if [ "$?" -ne 0 ]; then
-		tmux switch -t "${TMUX_SESSION}"
+		${TMUX_COMMAND} switch -t "${TMUX_SESSION}"
 	fi
 fi
 
