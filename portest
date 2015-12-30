@@ -481,7 +481,8 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	svn*)	;;
 	esac
 	case ${REPO_TYPE} in
-	svn*)	for file in ${SVN_PATCH_FILE}; do
+	svn*)	cd ${PORTSDIR}
+		for file in ${SVN_PATCH_FILE}; do
 			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${SVN} ${SVN_PATCH_ARGS} "$file" "${PORTSDIR}"`
 			done
