@@ -442,7 +442,6 @@ svn_add_patchfile() {
 PATCH_FILES_LIST="${PATCH_FILES_LIST}
 "`echo "${OUTPUT}" | grep '^[^\>][ ][ ][ ].*' |  awk '{ print $(NF) }'`
 PATCH_STRIP_COUNT="${PATCH_STRIP_COUNT} ${STRIP_COUNT}"
-#! [ -n ${PATCH_STRIP_COUNT} ] && PATCH_STRIP_COUNT="${STRIP_COUNT}"
 STRIP_COUNT="$(( ${MAX_STRIP_COUNT} + 10 ))"
 }
 
@@ -450,20 +449,20 @@ svn_patchfile_check() {
 STRIP_COUNT="0"
 while [ "${MAX_STRIP_COUNT}" -gt "${STRIP_COUNT}" ]; do
 	OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" ${PORTSDIR}`"
-	if [ "1" -le "`echo ${OUTPUT} | grep -co 'already applied'`" ]; then
+	SUCCESS="`echo "${OUTPUT}" | grep -co '^.[ ][ ][ ]*'`"
+	FAILED="`echo "${OUTPUT}" | grep -co '^Skipped'`"
+	if [ "${SUCCESS}" -gt "${FAILED}" ]; then
 		svn_add_patchfile
-	elif [ "1" -le "`echo "${OUTPUT}" | grep -co 'Skipped paths'`" ]; then
+	else
 		STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
 		[ "${MAX_STRIP_COUNT}" -le "${STRIP_COUNT}" ] && echo Patchfile "$1" Failed, try a revert? && exit 1
-	else
-		svn_add_patchfile
 	fi
 done
 }
 
 svn_patchfile_patch() {
 for file in $1; do
-	for pos in `echo $2 | awk "{ print ${MONEY}${POS} }"`; do
+	for pos in `echo $2 | awk "{ print ${DOLLARSIGN}${POS} }"`; do
 		PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${SVN} ${SVN_PATCH_ARGS} --strip $pos "$file" "${PORTSDIR}"`
 	done
@@ -534,7 +533,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	case ${REPO_TYPE} in
 	svn*)	cd ${PORTSDIR}
 		POS="1"
-		MONEY="$"
+		DOLLARSIGN="$"
 		[ -n "${SVN_PATCH_FILE}" ] && svn_patchfile_patch "${SVN_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
 		[ -n "${GIT_PATCH_FILE}" ] && svn_patchfile_patch "${GIT_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
 		[ -n "${PATCH_PATCH_FILE}" ] && svn_patchfile_patch "${PATCH_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
