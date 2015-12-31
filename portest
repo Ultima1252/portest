@@ -447,15 +447,23 @@ STRIP_COUNT="$(( ${MAX_STRIP_COUNT} + 10 ))"
 
 svn_patchfile_check() {
 STRIP_COUNT="0"
+HIGHEST_SUCCESS="0"
+HIGHEST_FAILED="0"
 while [ "${MAX_STRIP_COUNT}" -gt "${STRIP_COUNT}" ]; do
 	OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" ${PORTSDIR}`"
 	SUCCESS="`echo "${OUTPUT}" | grep -co '^.[ ][ ][ ]*'`"
 	FAILED="`echo "${OUTPUT}" | grep -co '^Skipped'`"
-	if [ "${SUCCESS}" -gt "${FAILED}" ]; then
-		svn_add_patchfile
-	else
-		STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
-		[ "${MAX_STRIP_COUNT}" -le "${STRIP_COUNT}" ] && echo Patchfile "$1" Failed, try a revert? && exit 1
+	[ "0" -eq "${STRIP_COUNT}" ] && [ "0" -eq "${FAILED}" ] && svn_add_patchfile
+	[ "$(( ${HIGHEST_SUCCESS} - ${HIGHEST_FAILED} ))" -lt "$(( ${SUCCESS} - ${FAILED} ))" ] && HIGHEST_SUCCESS="${SUCCESS}" HIGHEST_FAILED="${FAILED}" HIGHEST_STRIP_COUNT="${STRIP_COUNT}" HIGHEST_OUTPUT="${OUTPUT}"
+	STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
+	if [ "${MAX_STRIP_COUNT}" -eq "${STRIP_COUNT}" ]; then
+		if [ "${HIGHEST_SUCCESS}" -gt "${HIGHEST_FAILED}" ]; then
+			STRIP_COUNT="${HIGHEST_STRIP_COUNT}"
+			OUTPUT="${HIGHEST_OUTPUT}"
+			svn_add_patchfile
+		else
+			echo Patchfile "$1" Failed, try a revert? && exit 1
+		fi
 	fi
 done
 }
