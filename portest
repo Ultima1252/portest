@@ -361,11 +361,11 @@ for file in "${@}"; do
 done
 
 for file in ${PATCH_FILE}; do
-	if [ "Index:" == "`head -4 \"$file\" | grep -m 1 -o \"^Index:\"`" ]; then
+	if [ "0" -lt "`head -4 \"$file\" | grep -co \"^Index:\"`" ]; then
 		SVN_PATCH_FILE="${SVN_PATCH_FILE} $file"
-	elif [ "diff --git" == "`head -4 \"$file\" | grep -m 1 -o \"^diff \-\-git\"`" ]; then
+	elif [ "0" -lt "`head -4 \"$file\" | grep -co \"^diff \-\-git\"`" ]; then
 		GIT_PATCH_FILE="${GIT_PATCH_FILE} $file"
-	elif [ "diff" == "`head -4 \"$file\" | grep -m 1 -o \"^diff\"`" ]; then
+	elif [ "0" -lt "`head -4 \"$file\" | grep -co \"^diff\"`" ]; then
 		PATCH_PATCH_FILE="${PATCH_PATCH_FILE} $file"
 	else
 		echo "$file is not a recognized patch format"
@@ -537,7 +537,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		[ -n "${SVN_PATCH_FILE}" ] && svn_patchfile_patch "${SVN_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
 		[ -n "${GIT_PATCH_FILE}" ] && svn_patchfile_patch "${GIT_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
 		[ -n "${PATCH_PATCH_FILE}" ] && svn_patchfile_patch "${PATCH_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
-		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o reject`" == "reject" ]; then
+		if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co reject`" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
@@ -556,7 +556,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${GIT} ${GIT_PATCH_ARGS} "$file" 2>&1`
 			done
-		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o error`" == "error" ]; then
+		if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co error`" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
@@ -578,7 +578,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 			PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
 			done
-		if [ "`echo "${PATCH_OUTPUT}" | grep -m 1 -o rejects`" == "rejects" ]; then
+		if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co rejects`" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
