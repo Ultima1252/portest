@@ -178,9 +178,7 @@ if [ "${CREATE_REPO}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 fi
 
 : ${PATCH:="patch"}
-: ${PATCH_SVN_ARGS:="-Esf"}
-: ${PATCH_GIT_ARGS:="-Esfp1"}
-: ${PATCH_PATCH_ARGS:="-Esf"}
+: ${PATCH_ARGS:="-Ef"}
 : ${PORTSNAP:="portsnap"}
 : ${PORTSNAP_FETCH_ARGS:="fetch"}
 : ${PORTSNAP_EXTRACT_ARGS:="extract"}
@@ -443,6 +441,8 @@ add_patchfile() {
 "`echo "${OUTPUT}" | grep '^[^\>][ ][ ][ ].*' |  awk '{ print $(NF) }'` ;;
 	git*)	PATCH_FILES_LIST="${PATCH_FILES_LIST} 
 "`echo "${OUTPUT}" | grep '\.\.\.$' | awk '{ print $(NF) }'| sed 's/\.\.\.$//'` ;;
+	portsnap*)	PATCH_FILES_LIST="${PATCH_FILES_LIST}
+"`${PATCH} ${PATCH_ARGS} -C -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1" | grep -A 2 '\-\-\-\-' | grep '\.\.\.$' | awk '{ print $3 }'` ;;
 	esac
 	PATCH_STRIP_COUNT="${PATCH_STRIP_COUNT} ${STRIP_COUNT}"
 	STRIP_COUNT="$(( ${MAX_STRIP_COUNT} + 10 ))"
@@ -459,13 +459,18 @@ while [ "${MAX_STRIP_COUNT}" -gt "${STRIP_COUNT}" ]; do
 	svn*)	OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" ${PORTSDIR}`"
 		SUCCESS="`echo "${OUTPUT}" | grep -co '^.[ ][ ][ ]*'`"
 		FAILED="`echo "${OUTPUT}" | grep -co '^Skipped'`"
-		[ "0" -eq "${STRIP_COUNT}" ] && [ "0" -eq "${FAILED}" ] && add_patchfile ;;
+		[ "0" -eq "${STRIP_COUNT}" ] && [ "0" -eq "${FAILED}" ] && add_patchfile && return ;;
 	git*)	OUTPUT="`${GIT} ${GIT_APPLY_ARGS} -p${STRIP_COUNT} --check -v "$1" 2>&1`"
-		[ "$?" -eq "0" ] && add_patchfile
-		[ "1" -le "`echo "${OUTPUT}" | grep -co 'patch does not apply'`" ] && add_patchfile
+		[ "$?" -eq "0" ] && add_patchfile && return
+		[ "1" -le "`echo "${OUTPUT}" | grep -co 'patch does not apply'`" ] && add_patchfile && return
 		SUCCESS="`echo "${OUTPUT}" | grep -co '\.\.\.$'`"
 		FAILED="`echo "${OUTPUT}" | grep -co ':'`"
 		SUCCESS="$(( ${SUCCESS} - ${FAILED} ))" ;;
+	portsnap*)	OUTPUT="`${PATCH} ${PATCH_ARGS} -sC -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1"`"
+			[ "$?" -eq "0" ] && add_patchfile "$1" && return
+			SUCCESS="100000"
+			FAILED="`echo "${OUTPUT}" | grep -co '\.\.\.'`"
+;;
 	esac
 		[ "$(( ${HIGHEST_SUCCESS} - ${HIGHEST_FAILED} ))" -lt "$(( ${SUCCESS} - ${FAILED} ))" ] && HIGHEST_SUCCESS="${SUCCESS}" HIGHEST_FAILED="${FAILED}" HIGHEST_STRIP_COUNT="${STRIP_COUNT}" HIGHEST_OUTPUT="${OUTPUT}"
 		STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
@@ -473,7 +478,7 @@ while [ "${MAX_STRIP_COUNT}" -gt "${STRIP_COUNT}" ]; do
 			if [ "${HIGHEST_SUCCESS}" -gt "${HIGHEST_FAILED}" ]; then
 				STRIP_COUNT="${HIGHEST_STRIP_COUNT}"
 				OUTPUT="${HIGHEST_OUTPUT}"
-				add_patchfile
+				add_patchfile "$1" && return
 			else
 				echo Patchfile "$1" Failed, try a revert? && exit 1
 			fi
@@ -489,6 +494,8 @@ for file in $1; do
 "`${SVN} ${SVN_PATCH_ARGS} --strip $pos "$file" "${PORTSDIR}"` ;;
 		git*)	PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${GIT} ${GIT_APPLY_ARGS} -p$pos "$file"` ;;
+		portsnap*)	PATCH_OUTPUT="${PATCH_OUTPUT}
+"`${PATCH} ${PATCH_ARGS} -s -p$pos -d "${PORTSDIR}" -i "$file"` ;;
 		esac
 	done
 	POS="$(( ${POS} + 1 ))"
@@ -496,26 +503,19 @@ done
 }
 
 filelist() {
-case ${REPO_TYPE} in
-	portsnap*)
-[ -n "${SVN_PATCH_FILE}" ] && PATCH_FILES_LIST="`cat ${SVN_PATCH_FILE} | grep '^Index:[ ].*' | awk '{ print $(NF) }'`"
-[ -n "${GIT_PATCH_FILE}" ] && PATCH_FILES_LIST="${PATCH_FILES_LIST}
-"`cat ${GIT_PATCH_FILE} | grep "^diff \-\-git" | awk '{ print $(NF) }' | sed 's/^b\///'`
-[ -n "${PATCH_PATCH_FILE}" ] && PATCH_FILES_LIST="${PATCH_FILES_LIST}
-"`cat ${PATCH_PATCH_FILE} | grep "^diff" | awk '{ print $(NF) }'` ;;
-	*)	for patchfile in ${SVN_PATCH_FILE}; do
-			MAX_STRIP_COUNT="`cat "$patchfile" | grep -o '^Index:[ ].*' | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
-			patchfile_check "$patchfile"
-		done
-		for patchfile in ${GIT_PATCH_FILE}; do
-			MAX_STRIP_COUNT="`cat "$patchfile" | grep '^diff \-\-git' | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
-			patchfile_check "$patchfile"
-		done
-		for patchfile in ${PATCH_PATCH_FILE}; do
-			MAX_STRIP_COUNT="`cat "$patchfile" | grep "^diff" | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
-			patchfile_check "$patchfile"
-		done ;;
-esac
+for patchfile in ${SVN_PATCH_FILE}; do
+	MAX_STRIP_COUNT="`cat "$patchfile" | grep -o '^Index:[ ].*' | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
+	patchfile_check "$patchfile"
+done
+for patchfile in ${GIT_PATCH_FILE}; do
+	MAX_STRIP_COUNT="`cat "$patchfile" | grep '^diff \-\-git' | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
+	patchfile_check "$patchfile"
+done
+for patchfile in ${PATCH_PATCH_FILE}; do
+	MAX_STRIP_COUNT="`cat "$patchfile" | grep "^diff" | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
+	patchfile_check "$patchfile"
+done
+PATCH_FILES_LIST="`echo "${PATCH_FILES_LIST}" | sort -u`"
 }
 folderlist() {
 [ -z "${PATCH_FILES_LIST}" ] && filelist
@@ -535,7 +535,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 			for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
 				! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
 			done
-			for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
+			for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\/// ; s/distfiles.*//'`; do
 				! [ -f "${BACKUPDIR}/$file" ] && cp -a "${PORTSDIR}/$file" "${BACKUPDIR}/$file" >/dev/null 2>&1
 			done
 			for dir in `echo "${PATCH_FOLDER_LIST}"`; do
@@ -553,24 +553,19 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	svn*)	;;
 	esac
 	DOLLARSIGN="$"
+	POS="1"
+	cd ${PORTSDIR}
+	[ -n "${SVN_PATCH_FILE}" ] && patchfile_patch "${SVN_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
+	[ -n "${GIT_PATCH_FILE}" ] && patchfile_patch "${GIT_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
+	[ -n "${PATCH_PATCH_FILE}" ] && patchfile_patch "${PATCH_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
 	case ${REPO_TYPE} in
-	svn*)	cd ${PORTSDIR}
-		POS="1"
-		[ -n "${SVN_PATCH_FILE}" ] && patchfile_patch "${SVN_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
-		[ -n "${GIT_PATCH_FILE}" ] && patchfile_patch "${GIT_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
-		[ -n "${PATCH_PATCH_FILE}" ] && patchfile_patch "${PATCH_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
-		if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co reject`" ]; then
+	svn*)	if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co reject`" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*';;
-	git*)	cd ${PORTSDIR}
-		POS="1"
-		[ -n "${SVN_PATCH_FILE}" ] && patchfile_patch "${SVN_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
-		[ -n "${GIT_PATCH_FILE}" ] && patchfile_patch "${GIT_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
-		[ -n "${PATCH_PATCH_FILE}" ] && patchfile_patch "${PATCH_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
-		if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co error`" ]; then
+	git*)	if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co error`" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
@@ -578,19 +573,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
 		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` >/dev/null 2>&1 ;;
-	*)	for file in ${SVN_PATCH_FILE}; do 
-			PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${PATCH} ${PATCH_SVN_ARGS} -d "${PORTSDIR}" -i "$file"`
-			done
-		for file in ${GIT_PATCH_FILE}; do
-			PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${PATCH} ${PATCH_GIT_ARGS} -d "${PORTSDIR}" -i "$file"`
-			done
-		for file in ${PATCH_PATCH_FILE}; do
-			PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${PATCH} ${PATCH_PATCH_ARGS} -d "${PORTSDIR}" -i "$file"`
-			done
-		if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co rejects`" ]; then
+	*)	if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co rejects`" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
