@@ -450,7 +450,6 @@ add_patchfile() {
 }
 
 patchfile_check() {
-STRIP_COUNT="0"
 HIGHEST_SUCCESS="0"
 HIGHEST_FAILED="0"
 cd ${PORTSDIR}
@@ -505,14 +504,17 @@ done
 filelist() {
 for patchfile in ${SVN_PATCH_FILE}; do
 	MAX_STRIP_COUNT="`cat "$patchfile" | grep -o '^Index:[ ].*' | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
+	STRIP_COUNT="`cat "$patchfile" | grep -o '^Index:[ ].*' | head -1 | awk '{ print $(NF) }'| grep -co '^/'`"
 	patchfile_check "$patchfile"
 done
 for patchfile in ${GIT_PATCH_FILE}; do
 	MAX_STRIP_COUNT="`cat "$patchfile" | grep '^diff \-\-git' | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
+	STRIP_COUNT="0"
 	patchfile_check "$patchfile"
 done
 for patchfile in ${PATCH_PATCH_FILE}; do
 	MAX_STRIP_COUNT="`cat "$patchfile" | grep "^diff" | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
+	STRIP_COUNT="`cat "$patchfile" | grep '^diff' | head -1 | awk '{ print $(NF) }'| grep -co '^/'`"
 	patchfile_check "$patchfile"
 done
 PATCH_FILES_LIST="`echo "${PATCH_FILES_LIST}" | sort -u`"
