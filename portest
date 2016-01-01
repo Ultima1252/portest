@@ -214,7 +214,8 @@ fi
 : ${POUDRIERE_PORTSDIR:="/usr/local/poudriere/ports"}
 : ${POUDRIERE_PORT:="default"}
 : ${POUDRIERE:="poudriere"}
-: ${POUDRIERE_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
+: ${POUDRIERE_STATUS_ARGS:="status -cH"}
+: ${POUDRIERE_BULK_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
 : ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"}
 
 # Set poudriere ports dir if being used #
@@ -632,11 +633,32 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 	TMUX_OPEN=1
 	TMUX_SESSION="portest-`openssl rand -hex 64`"
+	printf "Verifying jails not already running..."
 	for jail in ${POUDRIERE_JAILS}; do
-		[ -n "${TMUX_OPEN}" ] && ${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
-		! [ -n "${TMUX_OPEN}" ] && ${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_ARGS} -j $jail ${BUILD_LIST}
+		if [ "1" -eq "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "${POUDRIERE_PORT}"`" ]; then
+			echo " $jail is already running on ${POUDRIERE_PORT}" && exit 1
+		fi
+	done
+	printf " Done"
+	printf "\nStarting jails..."
+	for jail in ${POUDRIERE_JAILS}; do
+		[ -n "${TMUX_OPEN}" ] && ${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+		! [ -n "${TMUX_OPEN}" ] && ${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
 		[ -n "${TMUX_OPEN}" ] && unset TMUX_OPEN
 	done
+	printf " Done"
+	printf "\nVerifying jails started successfully... Please wait..."
+	sleep 7
+	for jail in ${POUDRIERE_JAILS}; do
+		if [ "1" -ne "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "${POUDRIERE_PORT}"`" ]; then
+			if [ "1" -eq "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" ]; then
+				${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+			else
+				${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+			fi
+		fi
+	done
+	printf " done"
 	${TMUX_COMMAND} select-layout -t "${TMUX_SESSION}" ${TMUX_LAYOUT}
 	${TMUX_COMMAND} attach-session -t "${TMUX_SESSION}" >/dev/null 2>&1
 	if [ "$?" -ne 0 ]; then
