@@ -464,7 +464,8 @@ while [ "${MAX_STRIP_COUNT}" -gt "${STRIP_COUNT}" ]; do
 		[ "$?" -eq "0" ] && add_patchfile
 		[ "1" -le "`echo "${OUTPUT}" | grep -co 'patch does not apply'`" ] && add_patchfile
 		SUCCESS="`echo "${OUTPUT}" | grep -co '\.\.\.$'`"
-		FAILED="`echo "${OUTPUT}" | grep -co ':'`" ;;
+		FAILED="`echo "${OUTPUT}" | grep -co ':'`"
+		SUCCESS="$(( ${SUCCESS} - ${FAILED} ))" ;;
 	esac
 		[ "$(( ${HIGHEST_SUCCESS} - ${HIGHEST_FAILED} ))" -lt "$(( ${SUCCESS} - ${FAILED} ))" ] && HIGHEST_SUCCESS="${SUCCESS}" HIGHEST_FAILED="${FAILED}" HIGHEST_STRIP_COUNT="${STRIP_COUNT}" HIGHEST_OUTPUT="${OUTPUT}"
 		STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
