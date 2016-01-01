@@ -358,12 +358,8 @@ for file in "${@}"; do
 done
 
 for file in ${PATCH_FILE}; do
-	if [ "0" -lt "`head -4 \"$file\" | grep -co \"^Index:\"`" ]; then
-		SVN_PATCH_FILE="${SVN_PATCH_FILE} $file"
-	elif [ "0" -lt "`head -4 \"$file\" | grep -co \"^diff \-\-git\"`" ]; then
-		GIT_PATCH_FILE="${GIT_PATCH_FILE} $file"
-	elif [ "0" -lt "`head -4 \"$file\" | grep -co \"^diff\"`" ]; then
-		PATCH_PATCH_FILE="${PATCH_PATCH_FILE} $file"
+	if [ "0" -lt "`cat "$file" | grep -co '^+++[ ].*'`" ]; then
+		UNI_PATCH_FILE="${UNI_PATCH_FILE} $file"
 	else
 		echo "$file is not a recognized patch format"
 		exit 1
@@ -502,23 +498,28 @@ done
 }
 
 filelist() {
-for patchfile in ${SVN_PATCH_FILE}; do
-	MAX_STRIP_COUNT="`cat "$patchfile" | grep -o '^Index:[ ].*' | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
-	STRIP_COUNT="`cat "$patchfile" | grep -o '^Index:[ ].*' | head -1 | awk '{ print $(NF) }'| grep -co '^/'`"
-	patchfile_check "$patchfile"
-done
-for patchfile in ${GIT_PATCH_FILE}; do
-	MAX_STRIP_COUNT="`cat "$patchfile" | grep '^diff \-\-git' | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
-	STRIP_COUNT="0"
-	patchfile_check "$patchfile"
-done
-for patchfile in ${PATCH_PATCH_FILE}; do
-	MAX_STRIP_COUNT="`cat "$patchfile" | grep "^diff" | head -1 | awk '{ print $(NF) }'| awk -F/ '{ print NF-1 }'`"
-	STRIP_COUNT="`cat "$patchfile" | grep '^diff' | head -1 | awk '{ print $(NF) }'| grep -co '^/'`"
+for patchfile in ${UNI_PATCH_FILE}; do
+	if [ "/dev/null" != "`cat "$patchfile" | grep -m 1 '^+++[ ]' | awk '{ print $2 }'`" ]; then
+		MAX_STRIP_COUNT="`cat "$patchfile" | grep -m 1 '^+++[ ]' | awk '{ print $2 }'| awk -F/ '{ print NF-1 }'`"
+		TRUE="1"
+	else
+		MAX_STRIP_COUNT="`cat "$patchfile" | grep -m 1 '^---[ ]' | awk '{ print $2 }'| awk -F/ '{ print NF-1 }'`"
+		TRUE="0"
+	fi
+	case ${REPO_TYPE} in
+		svn) STRIP_COUNT="0" ;;
+		git) STRIP_COUNT="0" ;;
+		*) 	if [ "${TRUE}" -eq "1" ]; then
+				STRIP_COUNT="`cat "$patchfile" | grep -m 1 '^+++[ ]' | awk '{ print $2 }' | grep -co '^/'`"
+			else
+				STRIP_COUNT="`cat "$patchfile" | grep -m 1 '^---[ ]' | awk '{ print $2 }' | grep -co '^/'`"
+			fi;
+	esac
 	patchfile_check "$patchfile"
 done
 PATCH_FILES_LIST="`echo "${PATCH_FILES_LIST}" | sort -u`"
 }
+
 folderlist() {
 [ -z "${PATCH_FILES_LIST}" ] && filelist
 [ -n "${PATCH_FILES_LIST}" ] && PATCH_FOLDER_LIST="`echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//'`"
@@ -557,9 +558,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	DOLLARSIGN="$"
 	POS="1"
 	cd ${PORTSDIR}
-	[ -n "${SVN_PATCH_FILE}" ] && patchfile_patch "${SVN_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
-	[ -n "${GIT_PATCH_FILE}" ] && patchfile_patch "${GIT_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
-	[ -n "${PATCH_PATCH_FILE}" ] && patchfile_patch "${PATCH_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
+	[ -n "${UNI_PATCH_FILE}" ] && patchfile_patch "${UNI_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
 	case ${REPO_TYPE} in
 	svn*)	if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co reject`" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
