@@ -390,9 +390,11 @@ fi
 cd "${PORTSDIR}"
 for file in "${@}"; do
 	if [ -f "$file" ]; then
-		PATCH_FILE="${PATCH_FILE} $file"
+		PATCH_FILE="${PATCH_FILE}
+$file"
 	elif [ -f "${CURDIR}/$file" ]; then
-		PATCH_FILE="${PATCH_FILE} ${CURDIR}/$file"
+		PATCH_FILE="${PATCH_FILE}
+${CURDIR}/$file"
 	else
 		echo "$file not found"
 		exit 1
@@ -401,7 +403,8 @@ done
 
 for file in ${PATCH_FILE}; do
 	if [ "`cat "$file" | grep -com1 '^+++[ ].*'`" -eq "1" ]; then
-		UNI_PATCH_FILE="${UNI_PATCH_FILE} $file"
+		UNI_PATCH_FILE="${UNI_PATCH_FILE}
+$file"
 	else
 		echo "$file is not a recognized patch format"
 		exit 1
@@ -483,7 +486,8 @@ add_patchfile() {
 	portsnap*)	PATCH_FILES_LIST="${PATCH_FILES_LIST}
 "`${PATCH} ${PATCH_ARGS} -C -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1" | grep -A 2 '\-\-\-\-' | grep '\.\.\.$' | awk '{ print $3 }'` ;;
 	esac
-	PATCH_STRIP_COUNT="${PATCH_STRIP_COUNT} ${STRIP_COUNT}"
+	PATCH_STRIP_COUNT="${PATCH_STRIP_COUNT}
+${STRIP_COUNT}"
 	STRIP_COUNT="$(( ${MAX_STRIP_COUNT} + 10 ))"
 }
 
