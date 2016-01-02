@@ -197,6 +197,8 @@ fi
 : ${GIT_RESET_ARGS:="reset --hard"}
 : ${GIT_STATUS_ARGS:="status -s"}
 : ${GIT_UPDATE_ARGS:="pull"}
+: ${MAKE:="/usr/bin/make"}
+: ${OPENSSL:="/usr/bin/openssl"}
 : ${TMUX_COMMAND:="/usr/local/bin/tmux"}
 : ${TMUX_LAYOUT:="tiled"}
 : ${RM:="/bin/rm"}
@@ -225,33 +227,67 @@ fi
 
 CURDIR="`pwd`"
 
-# Check for commands #
-if [ -x "${SVN}" ]; then
-	SVN_CHECK="1"
-else
-	if [ -x "/usr/bin/svnlite" ]; then
-		SVN="/usr/bin/svnlite"
-		SVN_CHECK="1"
-	else
-		SVN_CHECK="0"
-	fi
-fi
-
+# Check commands #
 check_git() {
 if ! [ -x "${GIT}" ]; then
-echo "git not found. Try installing it, pkg install git" && exit 1
+	GIT="`type -p git`"
+	if ! [ -x "${GIT}" ]; then
+		echo "git not found. Try installing it, pkg install git" && exit 1
+	fi
 fi
 }
 
 check_svn() {
-if [ "${SVN_CHECK}" -ne "1" ]; then
-echo "svn or svnlite not found. Try installing it, pkg install subversion" && exit 1
+if ! [ -x "${SVN}" ]; then
+	SVN="`type -p svn`"
+	if ! [ -x "${SVN}" ]; then
+		SVN="`type -p svnlite`"
+		if ! [ -x "${SVN}" ]; then
+			echo "svn or svnlite not found. Try installing it, pkg install subversion" && exit 1
+		fi
+	fi
 fi
 }
 
-check_portsnap() {
-if ! [ -x "${PORTSNAP}" ]; then
-echo "portsnap not found" && exit 1
+check_port() {
+if ! [ -x "${PORT}" ]; then
+	PORT="`type -p port`"
+	if ! [ -x "${PORT}" ]; then
+		echo "port not found. Try installing it, pkg install porttools" && exit 1
+	fi
+fi
+}
+
+check_portlint() {
+if ! [ -x "${PORTLINT}" ]; then
+	PORTLINT="`type -p portlint`"
+	if ! [ -x "${PORTLINT}" ]; then
+		echo "portlint not found. Try installing it, pkg install portlint" && exit 1
+	fi
+fi
+}
+
+check_poudriere() {
+if ! [ -x "${POUDRIERE}" ]; then
+	POUDRIERE="`type -p poudriere`"
+	if ! [ -x "${POUDRIERE}" ]; then
+	echo "poudriere not found. Try installing it, pkg install poudriere" && exit 1
+	fi
+fi
+}
+
+check_tmux() {
+if ! [ -x "${TMUX_COMMAND}" ]; then
+	TMUX_COMMAND="`type -p tmux`"
+	if ! [ -x "${TMUX_COMMAND}" ]; then
+	echo "tmux not found. Try installing it, pkg install tmux" && exit 1
+	fi
+fi
+}
+
+check_command() {
+if ! [ -x "$1" ]; then
+	echo "$1 not found" && exit 1
 fi
 }
 
@@ -262,6 +298,7 @@ check_empty_dir() {
 ### Create Repo ###
 if [ "${CREATE_REPO}" -eq "1" ]; then
 	if [ "${USE_POUDRIERE}" == "YES" ]; then
+		check_poudriere
 		${POUDRIERE} ${POUDRIERE_PORTS_ARGS}
 	else
 		case ${METHOD} in
@@ -282,7 +319,7 @@ if [ "${CREATE_REPO}" -eq "1" ]; then
 			fi
 			;;
 			portsnap*)
-			check_portsnap
+			check_command "${PORTSNAP}"
 			check_empty_dir "${PORTSDIR}"
 			cd ${PORTSDIR} && PORTSDIR="`pwd`"
 			if [ "${PORTSDIR}" != "/usr/ports" ]; then
@@ -311,7 +348,7 @@ cd ${PORTSDIR} && PORTSDIR="`pwd`"
 [ -d "${PORTSDIR}/.git" ] && check_git && REPO_TYPE="git" REPO="${GIT}" REPO_STATUS="${GIT_STATUS_ARGS}"
 
 if [ -z "${REPO_TYPE}" ]; then
-	check_portsnap
+	check_command "${PORTSNAP}"
 	if [ "${PORTSDIR}" != "/usr/ports" ]; then
 		: ${PORTSNAP_WRKDIR:="${PORTSDIR}/.snap"}
 		: ${PORTSNAP_ARGS:="-d ${PORTSNAP_WRKDIR} -p ${PORTSDIR}"}
@@ -355,6 +392,7 @@ done
 
 # Check for valid jails #
 if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
+	check_poudriere
 	[ -z "${POUDRIERE_JAILS}" ] && echo "no jails selected use -j or export POUDRIERE_JAILS=\"jail1 jail2\"" && exit 1
 	POUDRIERE_JAILS=`printf "%s\n" ${POUDRIERE_JAILS} | sort -u`
 	for jail in ${POUDRIERE_JAILS}; do
@@ -429,7 +467,6 @@ add_patchfile() {
 	esac
 	PATCH_STRIP_COUNT="${PATCH_STRIP_COUNT} ${STRIP_COUNT}"
 	STRIP_COUNT="$(( ${MAX_STRIP_COUNT} + 10 ))"
-	
 }
 
 patchfile_check() {
@@ -485,6 +522,11 @@ done
 }
 
 filelist() {
+case ${REPO_TYPE} in
+	svn*);;
+	git*);;
+	*) check_command "${PATCH}" ;;
+esac
 for patchfile in ${UNI_PATCH_FILE}; do
 	if [ "/dev/null" != "`cat "$patchfile" | grep -m1 '^+++[ ]' | awk '{ print $2 }'`" ]; then
 		MAX_STRIP_COUNT="`cat "$patchfile" | grep -m1 '^+++[ ]' | awk '{ print $2 }'| awk -F/ '{ print NF-1 }'`"
@@ -496,7 +538,7 @@ for patchfile in ${UNI_PATCH_FILE}; do
 	case ${REPO_TYPE} in
 		svn) STRIP_COUNT="0" ;;
 		git) STRIP_COUNT="0" ;;
-		*) 	if [ "${TRUE}" -eq "1" ]; then
+		*)	if [ "${TRUE}" -eq "1" ]; then
 				STRIP_COUNT="`cat "$patchfile" | grep -m1 '^+++[ ]' | awk '{ print $2 }' | grep -co '^/'`"
 			else
 				STRIP_COUNT="`cat "$patchfile" | grep -m1 '^---[ ]' | awk '{ print $2 }' | grep -co '^/'`"
@@ -574,7 +616,6 @@ fi
 
 # Generate a list of ports for poudriere to build #
 buildlist() {
-
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 cd ${PORTSDIR}
 BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u`"
@@ -597,6 +638,7 @@ fi
 
 ### Portlint ###
 if [ "${TEST_PORTLINT}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
+	check_portlint
 	[ -z "${BUILD_LIST}" ] && buildlist
 	for port in ${BUILD_LIST}; do
 		cd "${PORTSDIR}/$port"
@@ -608,20 +650,24 @@ fi
 
 ### Port test and Poudriere testing ###
 if [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
+	check_port
+	check_command "${MAKE}"
 	${RM} ${RM_ARGS} "`find ${PORTSDIR} -type d -name "work" -maxdepth 3`"
 	[ -z "${BUILD_LIST}" ] && buildlist
 	for port in ${BUILD_LIST}; do
 		cd "${PORTSDIR}/$port"
-		make depends BATCH=yes
+		${MAKE} depends BATCH=yes
 		${PORT} ${PORT_ARGS}
 	done
 elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
+	check_tmux
+	check_command "${OPENSSL}"
 	[ -z "${BUILD_LIST}" ] && buildlist
 	TMUX_OPEN=1
-	TMUX_SESSION="portest-`openssl rand -hex 64`"
+	TMUX_SESSION="portest-`${OPENSSL} rand -hex 64`"
 	printf "Verifying jails not already running..."
 	for jail in ${POUDRIERE_JAILS}; do
-		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "${POUDRIERE_PORT}"`" -eq "1" ]; then
+		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`" -eq "1" ]; then
 			echo " $jail is already running on ${POUDRIERE_PORT}" && exit 1
 		fi
 	done
@@ -636,7 +682,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	printf "\nVerifying jails started successfully... Please wait..."
 	sleep 7
 	for jail in ${POUDRIERE_JAILS}; do
-		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "${POUDRIERE_PORT}"`" -ne "1" ]; then
+		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`" -ne "1" ]; then
 			if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -ne "1" ]; then
 				${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
 			else
@@ -655,40 +701,34 @@ fi
 ### Revert Patch ###
 cd ${PORTSDIR}
 case ${REPO_TYPE} in
-	svn)
-if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
-	[ -z "${BUILD_LIST}" ] && buildlist
+	svn*)	if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
+			[ -z "${BUILD_LIST}" ] && buildlist
 # Wierd cases where svn won't see short filenames in list.    #
 # This seems to be an svn bug, this list helps in those cases #
-	PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[^/]*\/[^/]*\/[^/]*'`"
-	for file in ${BUILD_LIST}; do
-		${RM} ${RM_ARGS} "${PORTSDIR}/$file"
-	done
-	for file in ${PATCH_FILES_LIST}; do
-		${RM} ${RM_ARGS} "${PORTSDIR}/$file"
-	done
-	[ -n "${BUILD_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${BUILD_LIST}
-	[ -n "${PATCH_FILES_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
-	[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
-	${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-elif [ "${REVERT_HARD}"  -eq "1" ]; then
-	svn_hard_revert
-fi
-	;;
-	git)
-if [ "${REVERT_SOFT}" -eq "1" ] || [ "${REVERT_HARD}" -eq "1" ]; then
-	git_revert
-fi
-	;;
-	portsnap)
-if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
-	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
-	portsnap_soft_revert
-elif [ "${REVERT_HARD}"  -eq "1" ]; then
-	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
-	cd ${PORTSDIR}
-	${RM} ${RM_ARGS} "${BACKUPDIR}"
-	${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-fi
-	;;
+			PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[^/]*\/[^/]*\/[^/]*'`"
+			for file in ${BUILD_LIST}; do
+				${RM} ${RM_ARGS} "${PORTSDIR}/$file"
+			done
+			for file in ${PATCH_FILES_LIST}; do
+				${RM} ${RM_ARGS} "${PORTSDIR}/$file"
+			done
+			[ -n "${BUILD_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${BUILD_LIST}
+			[ -n "${PATCH_FILES_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
+			[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
+			${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+		elif [ "${REVERT_HARD}"  -eq "1" ]; then
+			svn_hard_revert
+		fi ;;
+	git*)	if [ "${REVERT_SOFT}" -eq "1" ] || [ "${REVERT_HARD}" -eq "1" ]; then
+			git_revert
+		fi ;;
+	portsnap*)	if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
+				! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
+				portsnap_soft_revert
+			elif [ "${REVERT_HARD}"  -eq "1" ]; then
+				${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
+				cd ${PORTSDIR}
+				${RM} ${RM_ARGS} "${BACKUPDIR}"
+				${RM} `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+			fi ;;
 esac
