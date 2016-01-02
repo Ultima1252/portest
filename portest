@@ -230,7 +230,7 @@ CURDIR="`pwd`"
 # Check commands #
 check_git() {
 if ! [ -x "${GIT}" ]; then
-	GIT="`type -p git`"
+	GIT="`which git`"
 	if ! [ -x "${GIT}" ]; then
 		echo "git not found. Try installing it, pkg install git" && exit 1
 	fi
@@ -239,9 +239,9 @@ fi
 
 check_svn() {
 if ! [ -x "${SVN}" ]; then
-	SVN="`type -p svn`"
+	SVN="`which svn`"
 	if ! [ -x "${SVN}" ]; then
-		SVN="`type -p svnlite`"
+		SVN="`which svnlite`"
 		if ! [ -x "${SVN}" ]; then
 			echo "svn or svnlite not found. Try installing it, pkg install subversion" && exit 1
 		fi
@@ -251,7 +251,7 @@ fi
 
 check_port() {
 if ! [ -x "${PORT}" ]; then
-	PORT="`type -p port`"
+	PORT="`which port`"
 	if ! [ -x "${PORT}" ]; then
 		echo "port not found. Try installing it, pkg install porttools" && exit 1
 	fi
@@ -260,7 +260,7 @@ fi
 
 check_portlint() {
 if ! [ -x "${PORTLINT}" ]; then
-	PORTLINT="`type -p portlint`"
+	PORTLINT="`which portlint`"
 	if ! [ -x "${PORTLINT}" ]; then
 		echo "portlint not found. Try installing it, pkg install portlint" && exit 1
 	fi
@@ -269,7 +269,7 @@ fi
 
 check_poudriere() {
 if ! [ -x "${POUDRIERE}" ]; then
-	POUDRIERE="`type -p poudriere`"
+	POUDRIERE="`which poudriere`"
 	if ! [ -x "${POUDRIERE}" ]; then
 	echo "poudriere not found. Try installing it, pkg install poudriere" && exit 1
 	fi
@@ -278,9 +278,27 @@ fi
 
 check_tmux() {
 if ! [ -x "${TMUX_COMMAND}" ]; then
-	TMUX_COMMAND="`type -p tmux`"
+	TMUX_COMMAND="`which tmux`"
 	if ! [ -x "${TMUX_COMMAND}" ]; then
 	echo "tmux not found. Try installing it, pkg install tmux" && exit 1
+	fi
+fi
+}
+
+check_openssl() {
+if ! [ -x "${OPENSSL}" ]; then
+	OPENSSL="`which openssl`"
+	if ! [ -x "${OPENSSL}" ]; then
+	echo "openssl not found. Try installing it, pkg install openssl" && exit 1
+	fi
+fi
+}
+
+check_make() {
+if ! [ -x "${MAKE}" ]; then
+	MAKE="`which make`"
+	if ! [ -x "${MAKE}" ]; then
+	echo "make not found" && exit 1
 	fi
 fi
 }
@@ -651,7 +669,7 @@ fi
 ### Port test and Poudriere testing ###
 if [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	check_port
-	check_command "${MAKE}"
+	check_make
 	${RM} ${RM_ARGS} "`find ${PORTSDIR} -type d -name "work" -maxdepth 3`"
 	[ -z "${BUILD_LIST}" ] && buildlist
 	for port in ${BUILD_LIST}; do
@@ -661,7 +679,7 @@ if [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	done
 elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	check_tmux
-	check_command "${OPENSSL}"
+	check_openssl
 	[ -z "${BUILD_LIST}" ] && buildlist
 	TMUX_OPEN=1
 	TMUX_SESSION="portest-`${OPENSSL} rand -hex 64`"
