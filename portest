@@ -177,19 +177,19 @@ if [ "${CREATE_REPO}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	esac
 fi
 
-: ${PATCH:="patch"}
+: ${PATCH:="/usr/bin/patch"}
 : ${PATCH_ARGS:="-Ef"}
-: ${PORTSNAP:="portsnap"}
+: ${PORTSNAP:="/usr/sbin/portsnap"}
 : ${PORTSNAP_FETCH_ARGS:="fetch"}
 : ${PORTSNAP_EXTRACT_ARGS:="extract"}
 : ${PORTSNAP_UPDATE_ARGS:="update"}
-: ${SVN:="svn"}
+: ${SVN:="/usr/local/bin/svn"}
 : ${SVN_CHECKOUT_ARGS:="checkout ${SVN_REPO_URL}"}
 : ${SVN_PATCH_ARGS:="patch"}
 : ${SVN_REVERT_ARGS:="revert -R"}
 : ${SVN_STATUS_ARGS:="status"}
 : ${SVN_UPDATE_ARGS:="update"}
-: ${GIT:="git"}
+: ${GIT:="/usr/local/bin/git"}
 : ${GIT_ADD_ARGS:="add -AN"}
 : ${GIT_CLEAN_ARGS:="clean -fd -f"}
 : ${GIT_CLONE_ARGS:="clone --depth 1 -b ${BRANCH} ${GIT_REPO_URL}"}
@@ -197,13 +197,13 @@ fi
 : ${GIT_RESET_ARGS:="reset --hard"}
 : ${GIT_STATUS_ARGS:="status -s"}
 : ${GIT_UPDATE_ARGS:="pull"}
-: ${TMUX_COMMAND:="tmux"}
+: ${TMUX_COMMAND:="/usr/local/bin/tmux"}
 : ${TMUX_LAYOUT:="tiled"}
-: ${RM:="rm"}
+: ${RM:="/bin/rm"}
 : ${RM_ARGS:="-rf"}
-: ${PORTLINT:="portlint"}
+: ${PORTLINT:="/usr/local/bin/portlint"}
 : ${PORTLINT_ARGS:="-A"}
-: ${PORT:="port"}
+: ${PORT:="/usr/local/bin/port"}
 : ${PORT_ARGS:="test"}
 : ${PORTSDIR:="/usr/ports"}
 : ${BULK_FILE:="build.ports.txt"}
@@ -213,7 +213,7 @@ fi
 : ${POUDRIERE_JAILS:=""}
 : ${POUDRIERE_PORTSDIR:="/usr/local/poudriere/ports"}
 : ${POUDRIERE_PORT:="default"}
-: ${POUDRIERE:="poudriere"}
+: ${POUDRIERE:="/usr/local/bin/poudriere"}
 : ${POUDRIERE_STATUS_ARGS:="status -cH"}
 : ${POUDRIERE_BULK_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
 : ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"}
@@ -226,39 +226,38 @@ fi
 CURDIR="`pwd`"
 
 # Check for commands #
-${SVN} help >/dev/null 2>&1
-if [ "$?" -ne "0" ]; then
-	svnlite help >/dev/null 2>&1
-	if [ "$?" -eq "0" ]; then
-		SVN="svnlite"
+if [ -x "${SVN}" ]; then
+	SVN_CHECK="1"
+else
+	if [ -x "/usr/bin/svnlite" ]; then
+		SVN="/usr/bin/svnlite"
+		SVN_CHECK="1"
 	else
-		SVN_CHECK="NO"
+		SVN_CHECK="0"
 	fi
-fi
-${GIT} help >/dev/null 2>&1
-if [ "$?" -ne "0" ]; then
-	GIT_CHECK="NO"
-fi
-${PORTSNAP} >/dev/null 2>&1
-if [ "$?" -ne "0" ]; then
-	PORTSNAP_CHECK="NO"
 fi
 
 check_git() {
-if [ "${GIT_CHECK}" == "NO" ]; then
+if ! [ -x "${GIT}" ]; then
 echo "git not found. Try installing it, pkg install git" && exit 1
 fi
 }
 
 check_svn() {
-if [ "${SVN_CHECK}" == "NO" ]; then
+if [ "${SVN_CHECK}" -ne "1" ]; then
 echo "svn or svnlite not found. Try installing it, pkg install subversion" && exit 1
+fi
+}
+
+check_portsnap() {
+if ! [ -x "${PORTSNAP}" ]; then
+echo "portsnap not found" && exit 1
 fi
 }
 
 check_empty_dir() {
 	mkdir -p "$1"
-	[ ! "`find \"$1\" -type d -empty -maxdepth 1`" ] && echo $1 is not empty && exit 1
+	[ ! "`find "$1" -type d -empty -maxdepth 1`" ] && echo "$1 is not empty" && exit 1
 }
 ### Create Repo ###
 if [ "${CREATE_REPO}" -eq "1" ]; then
@@ -267,23 +266,24 @@ if [ "${CREATE_REPO}" -eq "1" ]; then
 	else
 		case ${METHOD} in
 			git*)
-			check_git;
-			check_empty_dir "${PORTSDIR}";
+			check_git
+			check_empty_dir "${PORTSDIR}"
 			${GIT} ${GIT_CLONE_ARGS} "${PORTSDIR}"
 			if [ "$?" -ne "0" ]; then
 			echo "git clone failed" && exit 1
 			fi
 			;;
 			svn*)
-			check_svn;
-			check_empty_dir "${PORTSDIR}";
+			check_svn
+			check_empty_dir "${PORTSDIR}"
 			${SVN} ${SVN_CHECKOUT_ARGS} "${PORTSDIR}"
 			if [ "$?" -ne "0" ]; then
 			echo "svn checkout failed" && exit 1
 			fi
 			;;
-			portsnap)
-			check_empty_dir "${PORTSDIR}";
+			portsnap*)
+			check_portsnap
+			check_empty_dir "${PORTSDIR}"
 			cd ${PORTSDIR} && PORTSDIR="`pwd`"
 			if [ "${PORTSDIR}" != "/usr/ports" ]; then
 				mkdir : ${PORTSNAP_WRKDIR:="${PORTSDIR}/.snap"}
@@ -303,29 +303,15 @@ fi
 cd ${PORTSDIR} && PORTSDIR="`pwd`"
 : ${BACKUPDIR:="${PORTSDIR}/.bak"}
 
-if [ "FreeBSD Ports Collection" != "`head -1 "${PORTSDIR}/README" | grep -o \"FreeBSD Ports Collection\"`" ]; then
-	echo "PORTSDIR is set to an incorrect directory"
-	exit 1
-fi
+[ "`head -1 "${PORTSDIR}/README" | grep -com1 \"FreeBSD Ports Collection\"`" -ne "1" ] && echo "PORTSDIR is set to an incorrect directory" && exit 1
+
 # Check PORTSDIR is an svn or git tree #
-cd ${PORTSDIR}
-if [ "${SVN_CHECK}" != "NO" ]; then
-	${SVN} info >/dev/null 2>&1
-	if [ "$?" -eq "0" ]; then
-		REPO_TYPE="svn"
-		REPO="${SVN}"
-		REPO_STATUS="${SVN_STATUS_ARGS}"
-	fi
-fi
-if [ "${GIT_CHECK}" != "NO" ]; then
-	${GIT} branch >/dev/null 2>&1
-	if [ "$?" -eq "0" ]; then
-		REPO_TYPE="git"
-		REPO="${GIT}"
-		REPO_STATUS="${GIT_STATUS_ARGS}"
-	fi
-fi
-if [ -z "${REPO_TYPE}" ] && [ "${PORTSNAP_CHECK}" != "NO" ]; then
+[ -d "${PORTSDIR}/.svn" ] && check_svn && REPO_TYPE="svn" REPO="${SVN}" REPO_STATUS="${SVN_STATUS_ARGS}"
+
+[ -d "${PORTSDIR}/.git" ] && check_git && REPO_TYPE="git" REPO="${GIT}" REPO_STATUS="${GIT_STATUS_ARGS}"
+
+if [ -z "${REPO_TYPE}" ]; then
+	check_portsnap
 	if [ "${PORTSDIR}" != "/usr/ports" ]; then
 		: ${PORTSNAP_WRKDIR:="${PORTSDIR}/.snap"}
 		: ${PORTSNAP_ARGS:="-d ${PORTSNAP_WRKDIR} -p ${PORTSDIR}"}
@@ -359,7 +345,7 @@ for file in "${@}"; do
 done
 
 for file in ${PATCH_FILE}; do
-	if [ "0" -lt "`cat "$file" | grep -co '^+++[ ].*'`" ]; then
+	if [ "`cat "$file" | grep -com1 '^+++[ ].*'`" -eq "1" ]; then
 		UNI_PATCH_FILE="${UNI_PATCH_FILE} $file"
 	else
 		echo "$file is not a recognized patch format"
@@ -385,7 +371,7 @@ ${GIT} ${GIT_CLEAN_ARGS}
 
 portsnap_soft_revert() {
 cd ${BACKUPDIR}
-for dir in `find ./ -type d -maxdepth 1 | sed 's/\.\///' | grep '^[A-Z]'`; do
+for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
 	${RM} ${RM_ARGS} "${PORTSDIR}/$dir"
 	mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
 done
@@ -455,10 +441,10 @@ while [ "${MAX_STRIP_COUNT}" -gt "${STRIP_COUNT}" ]; do
 	svn*)	OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" ${PORTSDIR}`"
 		SUCCESS="`echo "${OUTPUT}" | grep -co '^.[ ][ ][ ]*'`"
 		FAILED="`echo "${OUTPUT}" | grep -co '^Skipped'`"
-		[ "0" -eq "${STRIP_COUNT}" ] && [ "0" -eq "${FAILED}" ] && add_patchfile && return ;;
+		[ "${STRIP_COUNT}" -eq "0" ] && [ "${FAILED}" -eq "0" ] && add_patchfile && return ;;
 	git*)	OUTPUT="`${GIT} ${GIT_APPLY_ARGS} -p${STRIP_COUNT} --check -v "$1" 2>&1`"
 		[ "$?" -eq "0" ] && add_patchfile && return
-		[ "1" -le "`echo "${OUTPUT}" | grep -co 'patch does not apply'`" ] && add_patchfile && return
+		[ "`echo "${OUTPUT}" | grep -com1 'patch does not apply'`" -ge "1" ] && add_patchfile && return
 		SUCCESS="`echo "${OUTPUT}" | grep -co '\.\.\.$'`"
 		FAILED="`echo "${OUTPUT}" | grep -co ':'`"
 		SUCCESS="$(( ${SUCCESS} - ${FAILED} ))" ;;
@@ -500,20 +486,20 @@ done
 
 filelist() {
 for patchfile in ${UNI_PATCH_FILE}; do
-	if [ "/dev/null" != "`cat "$patchfile" | grep -m 1 '^+++[ ]' | awk '{ print $2 }'`" ]; then
-		MAX_STRIP_COUNT="`cat "$patchfile" | grep -m 1 '^+++[ ]' | awk '{ print $2 }'| awk -F/ '{ print NF-1 }'`"
+	if [ "/dev/null" != "`cat "$patchfile" | grep -m1 '^+++[ ]' | awk '{ print $2 }'`" ]; then
+		MAX_STRIP_COUNT="`cat "$patchfile" | grep -m1 '^+++[ ]' | awk '{ print $2 }'| awk -F/ '{ print NF-1 }'`"
 		TRUE="1"
 	else
-		MAX_STRIP_COUNT="`cat "$patchfile" | grep -m 1 '^---[ ]' | awk '{ print $2 }'| awk -F/ '{ print NF-1 }'`"
+		MAX_STRIP_COUNT="`cat "$patchfile" | grep -m1 '^---[ ]' | awk '{ print $2 }'| awk -F/ '{ print NF-1 }'`"
 		TRUE="0"
 	fi
 	case ${REPO_TYPE} in
 		svn) STRIP_COUNT="0" ;;
 		git) STRIP_COUNT="0" ;;
 		*) 	if [ "${TRUE}" -eq "1" ]; then
-				STRIP_COUNT="`cat "$patchfile" | grep -m 1 '^+++[ ]' | awk '{ print $2 }' | grep -co '^/'`"
+				STRIP_COUNT="`cat "$patchfile" | grep -m1 '^+++[ ]' | awk '{ print $2 }' | grep -co '^/'`"
 			else
-				STRIP_COUNT="`cat "$patchfile" | grep -m 1 '^---[ ]' | awk '{ print $2 }' | grep -co '^/'`"
+				STRIP_COUNT="`cat "$patchfile" | grep -m1 '^---[ ]' | awk '{ print $2 }' | grep -co '^/'`"
 			fi;
 	esac
 	patchfile_check "$patchfile"
@@ -561,13 +547,13 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	cd ${PORTSDIR}
 	[ -n "${UNI_PATCH_FILE}" ] && patchfile_patch "${UNI_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
 	case ${REPO_TYPE} in
-	svn*)	if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co reject`" ]; then
+	svn*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 reject`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*';;
-	git*)	if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co error`" ]; then
+	git*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 error`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
@@ -575,7 +561,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
 		${RM} `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` >/dev/null 2>&1 ;;
-	*)	if [ "0" -lt "`echo "${PATCH_OUTPUT}" | grep -co rejects`" ]; then
+	*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 rejects`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed"
 			exit 1
@@ -635,7 +621,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	TMUX_SESSION="portest-`openssl rand -hex 64`"
 	printf "Verifying jails not already running..."
 	for jail in ${POUDRIERE_JAILS}; do
-		if [ "1" -eq "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "${POUDRIERE_PORT}"`" ]; then
+		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "${POUDRIERE_PORT}"`" -eq "1" ]; then
 			echo " $jail is already running on ${POUDRIERE_PORT}" && exit 1
 		fi
 	done
@@ -650,8 +636,8 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	printf "\nVerifying jails started successfully... Please wait..."
 	sleep 7
 	for jail in ${POUDRIERE_JAILS}; do
-		if [ "1" -ne "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "${POUDRIERE_PORT}"`" ]; then
-			if [ "1" -eq "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" ]; then
+		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "${POUDRIERE_PORT}"`" -ne "1" ]; then
+			if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -ne "1" ]; then
 				${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
 			else
 				${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
