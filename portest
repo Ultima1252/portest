@@ -521,8 +521,7 @@ while [ "${MAX_STRIP_COUNT}" -gt "${STRIP_COUNT}" ]; do
 	portsnap*)	OUTPUT="`${PATCH} ${PATCH_ARGS} -sC -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1"`"
 			[ "$?" -eq "0" ] && add_patchfile "$1" && return
 			SUCCESS="100000"
-			FAILED="`echo "${OUTPUT}" | ${GREP} -co '\.\.\.'`"
-;;
+			FAILED="`echo "${OUTPUT}" | ${GREP} -co '\.\.\.'`" ;;
 	esac
 		[ "$(( ${HIGHEST_SUCCESS} - ${HIGHEST_FAILED} ))" -lt "$(( ${SUCCESS} - ${FAILED} ))" ] && HIGHEST_SUCCESS="${SUCCESS}" HIGHEST_FAILED="${FAILED}" HIGHEST_STRIP_COUNT="${STRIP_COUNT}" HIGHEST_OUTPUT="${OUTPUT}"
 		STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
@@ -543,11 +542,11 @@ for file in $1; do
 	for pos in `echo $2 | ${AWK} "{ print ${DOLLARSIGN}${POS} }"`; do
 		case ${REPO_TYPE} in
 		svn*)	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${SVN} ${SVN_PATCH_ARGS} --strip $pos "$file" "${PORTSDIR}"` ;;
+"`${SVN} ${SVN_PATCH_ARGS} --strip $pos "$file" "${PORTSDIR}" 2>&1` ;;
 		git*)	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${GIT} ${GIT_APPLY_ARGS} -p$pos "$file"` ;;
+"`${GIT} ${GIT_APPLY_ARGS} -p$pos "$file" 2>&1` ;;
 		portsnap*)	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${PATCH} ${PATCH_ARGS} -s -p$pos -d "${PORTSDIR}" -i "$file"` ;;
+"`${PATCH} ${PATCH_ARGS} -s -p$pos -d "${PORTSDIR}" -i "$file" 2>&1` ;;
 		esac
 	done
 	POS="$(( ${POS} + 1 ))"
