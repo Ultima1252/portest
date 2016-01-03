@@ -230,7 +230,7 @@ CURDIR="`pwd`"
 # Check commands #
 check_git() {
 if ! [ -x "${GIT}" ]; then
-	GIT="`command -p git`"
+	GIT="`command -v git 2>/dev/null`"
 	if ! [ -x "${GIT}" ]; then
 		echo "git not found. Try installing it, pkg install git" && exit 1
 	fi
@@ -239,9 +239,9 @@ fi
 
 check_svn() {
 if ! [ -x "${SVN}" ]; then
-	SVN="`command -p svn`"
+	SVN="`command -v svn 2>/dev/null`"
 	if ! [ -x "${SVN}" ]; then
-		SVN="`command -p svnlite`"
+		SVN="`command -v svnlite 2>/dev/null`"
 		if ! [ -x "${SVN}" ]; then
 			echo "svn or svnlite not found. Try installing it, pkg install subversion" && exit 1
 		fi
@@ -251,7 +251,7 @@ fi
 
 check_port() {
 if ! [ -x "${PORT}" ]; then
-	PORT="`command -p port`"
+	PORT="`command -v port 2>/dev/null`"
 	if ! [ -x "${PORT}" ]; then
 		echo "port not found. Try installing it, pkg install porttools" && exit 1
 	fi
@@ -260,7 +260,7 @@ fi
 
 check_portlint() {
 if ! [ -x "${PORTLINT}" ]; then
-	PORTLINT="`command -p portlint`"
+	PORTLINT="`command -v portlint 2>/dev/null`"
 	if ! [ -x "${PORTLINT}" ]; then
 		echo "portlint not found. Try installing it, pkg install portlint" && exit 1
 	fi
@@ -269,7 +269,7 @@ fi
 
 check_poudriere() {
 if ! [ -x "${POUDRIERE}" ]; then
-	POUDRIERE="`command -p poudriere`"
+	POUDRIERE="`command -v poudriere 2>/dev/null`"
 	if ! [ -x "${POUDRIERE}" ]; then
 	echo "poudriere not found. Try installing it, pkg install poudriere" && exit 1
 	fi
@@ -278,7 +278,7 @@ fi
 
 check_tmux() {
 if ! [ -x "${TMUX_COMMAND}" ]; then
-	TMUX_COMMAND="`command -p tmux`"
+	TMUX_COMMAND="`command -v tmux 2>/dev/null`"
 	if ! [ -x "${TMUX_COMMAND}" ]; then
 	echo "tmux not found. Try installing it, pkg install tmux" && exit 1
 	fi
@@ -287,7 +287,8 @@ fi
 
 check_openssl() {
 if ! [ -x "${OPENSSL}" ]; then
-	OPENSSL="`command -p openssl`"
+	OPENSSL="`command -v openssl 2>/dev/null`"
+	echo $OPENSSL
 	if ! [ -x "${OPENSSL}" ]; then
 	echo "openssl not found. Try installing it, pkg install openssl" && exit 1
 	fi
@@ -296,7 +297,7 @@ fi
 
 check_make() {
 if ! [ -x "${MAKE}" ]; then
-	MAKE="`command -p make`"
+	MAKE="`command -v make 2>/dev/null`"
 	if ! [ -x "${MAKE}" ]; then
 	echo "make not found" && exit 1
 	fi
@@ -683,9 +684,9 @@ if [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	done
 elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	check_tmux
-	check_openssl
+	[ -z ${TMUX_SESSION} ] && check_openssl
 	[ -z "${BUILD_LIST}" ] && buildlist
-	TMUX_SESSION="portest-`${OPENSSL} rand -hex 64`"
+	: ${TMUX_SESSION:="portest-`${OPENSSL} rand -hex 16`"}
 	printf "Verifying jails not already running..."
 	for jail in ${POUDRIERE_JAILS}; do
 		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`" -eq "1" ]; then
