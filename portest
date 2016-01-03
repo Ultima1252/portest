@@ -30,7 +30,7 @@ PORTEST_VERSION="0.1.1"
 
 usage() {
 	cat << EOF
-Usage: portest [-m git] [-f bulkfile] [-U default2] [-d PORTSDIR] [-abcdprRtTuv] \\
+Usage: portest [-m git] [-f bulkfile] [-U default2] [-d PORTSDIR] [-abcCdprRtTuv] \\
                file.diff file2.diff ...
 
 Parameters:
@@ -56,6 +56,8 @@ Parameters:
 Options:
     -b     --  Generate the list of cat/ports based on port tree
                instead of diff, git and svn only, slow
+    -C     --  Check, Will still make backups and files required
+               to apply patches but will not apply them
     -d     --  Sets PORTSDIR, -U overrides this option
     -j     --  Jails used for poudriere, if multiple are used
                must be in "" with a space as a seperator,
@@ -80,8 +82,9 @@ TEST_BUILD="0"
 REPO_BUILD_LIST="0"
 CREATE_REPO="0"
 UPDATE_REPO="0"
+CHECK_ONLY=0
 
-while getopts ":abcd:j:f:m:prRtTuU:v" FLAG; do
+while getopts ":abcCd:j:f:m:prRtTuU:v" FLAG; do
 	case "${FLAG}" in
 	a)
 		ALL="1"
@@ -91,6 +94,9 @@ while getopts ":abcd:j:f:m:prRtTuU:v" FLAG; do
 		;;
 	c)
 		CREATE_REPO="1"
+		;;
+	C)
+		CHECK_ONLY="1"
 		;;
 	d)
 		PORTSDIR="${OPTARG}"
@@ -388,6 +394,13 @@ if [ -z "${REPO_TYPE}" ]; then
 	fi
 	REPO_TYPE="portsnap"
 fi
+if [ "${CHECK_ONLY}" -eq "1" ]; then
+	case ${REPO_TYPE} in
+		svn*) SVN_CHECK_ARGS="--dry-run" ;;
+		git*) GIT_CHECK_ARGS="--check" ;;
+		portsnap*) PATCH_CHECK_ARGS="-C" ;;
+	esac
+fi
 
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 	case ${REPO_TYPE} in
@@ -542,11 +555,11 @@ for file in $1; do
 	for pos in `echo $2 | ${AWK} "{ print ${DOLLARSIGN}${POS} }"`; do
 		case ${REPO_TYPE} in
 		svn*)	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${SVN} ${SVN_PATCH_ARGS} --strip $pos "$file" "${PORTSDIR}" 2>&1` ;;
+"`${SVN} ${SVN_PATCH_ARGS} ${SVN_CHECK_ARGS} --strip $pos "$file" "${PORTSDIR}" 2>&1` ;;
 		git*)	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${GIT} ${GIT_APPLY_ARGS} -p$pos "$file" 2>&1` ;;
+"`${GIT} ${GIT_APPLY_ARGS} ${GIT_CHECK_ARGS} -p$pos "$file" 2>&1` ;;
 		portsnap*)	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${PATCH} ${PATCH_ARGS} -s -p$pos -d "${PORTSDIR}" -i "$file" 2>&1` ;;
+"`${PATCH} ${PATCH_ARGS} ${PATCH_CHECK_ARGS} -s -p$pos -d "${PORTSDIR}" -i "$file" 2>&1` ;;
 		esac
 	done
 	POS="$(( ${POS} + 1 ))"
@@ -634,7 +647,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		fi
 		echo "${PATCH_OUTPUT}" | ${GREP} '^[^ ].*'
 		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
-		${RM} `${FIND} ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` >/dev/null 2>&1 ;;
+		${RM} `${FIND} ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` 2>/dev/null ;;
 	*)	if [ "`echo "${PATCH_OUTPUT}" | ${GREP} -com1 rejects`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | ${GREP} '^[^ ].*'
 			echo "Patch Failed"
@@ -642,7 +655,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		fi
 		echo "${PATCH_OUTPUT}" | ${GREP} '^[^ ].*'
 		cd ${PORTSDIR}
-		${RM} `${FIND} ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` ;;
+		${RM} `${FIND} ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` 2>/dev/null ;;
 	esac
 fi
 
