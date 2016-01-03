@@ -230,7 +230,7 @@ CURDIR="`pwd`"
 # Check commands #
 check_git() {
 if ! [ -x "${GIT}" ]; then
-	GIT="`which git`"
+	GIT="`command -p git`"
 	if ! [ -x "${GIT}" ]; then
 		echo "git not found. Try installing it, pkg install git" && exit 1
 	fi
@@ -239,9 +239,9 @@ fi
 
 check_svn() {
 if ! [ -x "${SVN}" ]; then
-	SVN="`which svn`"
+	SVN="`command -p svn`"
 	if ! [ -x "${SVN}" ]; then
-		SVN="`which svnlite`"
+		SVN="`command -p svnlite`"
 		if ! [ -x "${SVN}" ]; then
 			echo "svn or svnlite not found. Try installing it, pkg install subversion" && exit 1
 		fi
@@ -251,7 +251,7 @@ fi
 
 check_port() {
 if ! [ -x "${PORT}" ]; then
-	PORT="`which port`"
+	PORT="`command -p port`"
 	if ! [ -x "${PORT}" ]; then
 		echo "port not found. Try installing it, pkg install porttools" && exit 1
 	fi
@@ -260,7 +260,7 @@ fi
 
 check_portlint() {
 if ! [ -x "${PORTLINT}" ]; then
-	PORTLINT="`which portlint`"
+	PORTLINT="`command -p portlint`"
 	if ! [ -x "${PORTLINT}" ]; then
 		echo "portlint not found. Try installing it, pkg install portlint" && exit 1
 	fi
@@ -269,7 +269,7 @@ fi
 
 check_poudriere() {
 if ! [ -x "${POUDRIERE}" ]; then
-	POUDRIERE="`which poudriere`"
+	POUDRIERE="`command -p poudriere`"
 	if ! [ -x "${POUDRIERE}" ]; then
 	echo "poudriere not found. Try installing it, pkg install poudriere" && exit 1
 	fi
@@ -278,7 +278,7 @@ fi
 
 check_tmux() {
 if ! [ -x "${TMUX_COMMAND}" ]; then
-	TMUX_COMMAND="`which tmux`"
+	TMUX_COMMAND="`command -p tmux`"
 	if ! [ -x "${TMUX_COMMAND}" ]; then
 	echo "tmux not found. Try installing it, pkg install tmux" && exit 1
 	fi
@@ -287,7 +287,7 @@ fi
 
 check_openssl() {
 if ! [ -x "${OPENSSL}" ]; then
-	OPENSSL="`which openssl`"
+	OPENSSL="`command -p openssl`"
 	if ! [ -x "${OPENSSL}" ]; then
 	echo "openssl not found. Try installing it, pkg install openssl" && exit 1
 	fi
@@ -296,7 +296,7 @@ fi
 
 check_make() {
 if ! [ -x "${MAKE}" ]; then
-	MAKE="`which make`"
+	MAKE="`command -p make`"
 	if ! [ -x "${MAKE}" ]; then
 	echo "make not found" && exit 1
 	fi
@@ -685,7 +685,6 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	check_tmux
 	check_openssl
 	[ -z "${BUILD_LIST}" ] && buildlist
-	TMUX_OPEN=1
 	TMUX_SESSION="portest-`${OPENSSL} rand -hex 64`"
 	printf "Verifying jails not already running..."
 	for jail in ${POUDRIERE_JAILS}; do
@@ -696,27 +695,48 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	printf " Done"
 	printf "\nStarting jails..."
 	for jail in ${POUDRIERE_JAILS}; do
-		[ -n "${TMUX_OPEN}" ] && ${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
-		! [ -n "${TMUX_OPEN}" ] && ${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
-		[ -n "${TMUX_OPEN}" ] && unset TMUX_OPEN
+		if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -ne "1" ]; then
+			${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+		else
+			${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+		fi
+		sleep 1
 	done
 	printf " Done"
 	printf "\nVerifying jails started successfully... Please wait..."
-	sleep 7
-	for jail in ${POUDRIERE_JAILS}; do
-		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`" -ne "1" ]; then
-			if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -ne "1" ]; then
-				${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
-			else
-				${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+	: ${JAIL_MAX_VERIFY:="3"}
+	JAIL_VERIFY="0"
+	JAILS_STARTED="0"
+	while [ ${JAILS_STARTED} -ne "1" ] && [ "${JAIL_MAX_VERIFY}" -ge "${JAIL_VERIFY}" ]; do
+		sleep 10
+		JAILS_STARTED="1"
+		for jail in ${POUDRIERE_JAILS}; do
+			OUTPUT="`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`"
+			if [ "${OUTPUT}" -ne "1" ]; then
+				if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -eq "1" ]; then
+					${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+				else
+					${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+				fi
 			fi
-		fi
+			if [ "${JAILS_STARTED}" -ne "0" ] && [ "${OUTPUT}" -eq "1" ] ; then
+				JAILS_STARTED="1"
+			else
+				JAILS_STARTED="0"
+			fi
+		done
+		JAIL_VERIFY=$(( ${JAIL_VERIFY} + 1 ))
 	done
 	printf " done"
 	${TMUX_COMMAND} select-layout -t "${TMUX_SESSION}" ${TMUX_LAYOUT}
 	${TMUX_COMMAND} attach-session -t "${TMUX_SESSION}" >/dev/null 2>&1
 	if [ "$?" -ne 0 ]; then
 		${TMUX_COMMAND} switch -t "${TMUX_SESSION}"
+	fi
+	if [ "${REVERT_SOFT}" -eq "1" ] || [ "${REVERT_HARD}" -eq "1" ]; then
+		while [ "`${TMUX_COMMAND} list-sessions -F \#S | grep -com1 "${TMUX_SESSION}"`" -eq "1" ]; do
+			sleep 10
+		done
 	fi
 fi
 
