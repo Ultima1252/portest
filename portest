@@ -26,7 +26,7 @@
 # of the authors and should not be interpreted as representing official policies,
 # either expressed or implied, of the FreeBSD Project.
 
-PORTEST_VERSION="0.1.1"
+PORTEST_VERSION="0.1.2"
 
 usage() {
 	cat << EOF
