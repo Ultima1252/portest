@@ -709,14 +709,15 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	[ -z ${TMUX_SESSION} ] && check_openssl
 	[ -z "${BUILD_LIST}" ] && buildlist
 	: ${TMUX_SESSION:="portest-`${OPENSSL} rand -hex 16`"}
-	printf "Verifying jails not already running..."
+	printf "Verifying jails not already running"
 	for jail in ${POUDRIERE_JAILS}; do
 		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | ${AWK} '{ print $2 }' | ${GREP} -com1 "^${POUDRIERE_PORT}$"`" -eq "1" ]; then
 			echo " $jail is already running on ${POUDRIERE_PORT}" && exit 1
 		fi
+		printf "."
 	done
 	printf " Done"
-	printf "\nStarting jails..."
+	printf "\nStarting jails"
 	for jail in ${POUDRIERE_JAILS}; do
 		if [ "`${TMUX_COMMAND} list-sessions | ${GREP} -com1 "${TMUX_SESSION}"`" -ne "1" ]; then
 			${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
@@ -724,9 +725,10 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 			${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
 		fi
 		${SLEEP} 1
+		printf "."
 	done
 	printf " Done"
-	printf "\nVerifying jails started successfully... Please wait..."
+	printf "\nVerifying jails started successfully... Please wait"
 	: ${JAIL_MAX_VERIFY:="3"}
 	JAIL_VERIFY="0"
 	JAILS_STARTED="0"
@@ -747,6 +749,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 			else
 				JAILS_STARTED="0"
 			fi
+			printf "."
 		done
 		JAIL_VERIFY=$(( ${JAIL_VERIFY} + 1 ))
 	done
