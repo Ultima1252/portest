@@ -221,7 +221,7 @@ fi
 : ${SORT:="/usr/bin/sort"}
 : ${TOUCH:="/usr/bin/touch"}
 : ${PORTLINT:="/usr/local/bin/portlint"}
-: ${PORTLINT_ARGS:="-A"}
+: ${PORTLINT_ARGS:="-AC"}
 : ${PORT:="/usr/local/bin/port"}
 : ${PORT_ARGS:="test"}
 : ${PORTSDIR:="/usr/ports"}
@@ -519,7 +519,7 @@ patchfile_check() {
 HIGHEST_SUCCESS="0"
 HIGHEST_FAILED="0"
 cd ${PORTSDIR}
-while [ "${MAX_STRIP_COUNT}" -gt "${STRIP_COUNT}" ]; do
+while [ "${MAX_STRIP_COUNT}" -ge "${STRIP_COUNT}" ]; do
 	case ${REPO_TYPE} in
 	svn*)	OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" ${PORTSDIR}`"
 		SUCCESS="`echo "${OUTPUT}" | ${GREP} -co '^.[ ][ ][ ]*'`"
