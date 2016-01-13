@@ -87,60 +87,43 @@ CHECK_ONLY=0
 while getopts ":abcCd:j:f:m:prRtTuU:v" FLAG; do
 	case "${FLAG}" in
 	a)
-		ALL="1"
-		;;
+		ALL="1" ;;
 	b)
-		REPO_BUILD_LIST="1"
-		;;
+		REPO_BUILD_LIST="1" ;;
 	c)
-		CREATE_REPO="1"
-		;;
+		CREATE_REPO="1" ;;
 	C)
-		CHECK_ONLY="1"
-		;;
+		CHECK_ONLY="1" ;;
 	d)
-		PORTSDIR="${OPTARG}"
-		;;
+		PORTSDIR="${OPTARG}" ;;
 	j)
-		POUDRIERE_JAILS="${OPTARG}"
-		;;
+		POUDRIERE_JAILS="${OPTARG}" ;;
 	f)
 		POUDRIERE_BULK="1"
-		POUDRIERE_BULK_FILE="${OPTARG}"
-		;;
+		POUDRIERE_BULK_FILE="${OPTARG}" ;;
 	m)	
-		METHOD="${OPTARG}"
-		;;
+		METHOD="${OPTARG}" ;;
 	p)
-		DO_PATCH="1"
-		;;
+		DO_PATCH="1" ;;
 	r)
-		REVERT_SOFT="1"
-		;;
+		REVERT_SOFT="1" ;;
 	R)
-		REVERT_HARD="1"
-		;;
+		REVERT_HARD="1" ;;
 	t)
-		TEST_PORTLINT="1"
-		;;
+		TEST_PORTLINT="1" ;;
 	T)
-		TEST_BUILD="1"
-		;;
+		TEST_BUILD="1" ;;
 	u)
-		UPDATE_REPO="1"
-		;;
+		UPDATE_REPO="1" ;;
 	U)
 		USE_POUDRIERE="YES"
-		POUDRIERE_PORT="${OPTARG}"
-		;;
+		POUDRIERE_PORT="${OPTARG}" ;;
 	v)
 		echo "${PORTEST_VERSION}"
-		exit 0
-		;;
+		exit 0 ;;
 	*)
 		usage
-		exit 1
-		;;
+		exit 1 ;;
 	esac
 done
 
@@ -341,8 +324,7 @@ $file"
 		PATCH_FILE="${PATCH_FILE}
 ${CURDIR}/$file"
 	else
-		echo "$file not found"
-		exit 1
+		echo "$file not found" && exit 1
 	fi
 done
 
@@ -351,8 +333,7 @@ for file in ${PATCH_FILE}; do
 		UNI_PATCH_FILE="${UNI_PATCH_FILE}
 $file"
 	else
-		echo "$file is not a recognized patch format"
-		exit 1
+		echo "$file is not a recognized patch format" && exit 1
 	fi
 done
 
@@ -555,22 +536,19 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	case ${REPO_TYPE} in
 	svn*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 reject`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
-			echo "Patch Failed"
-			exit 1
+			echo "Patch Failed" && exit 1
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*';;
 	git*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 error`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
-			echo "Patch Failed"
-			exit 1
+			echo "Patch Failed" && exit 1
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
 		rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` 2>/dev/null ;;
 	*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 rejects`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
-			echo "Patch Failed"
-			exit 1
+			echo "Patch Failed" && exit 1
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		cd ${PORTSDIR}
