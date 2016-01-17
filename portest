@@ -31,7 +31,7 @@ PORTEST_VERSION="0.1.2"
 usage() {
 	cat << EOF
 Usage: portest [-m git] [-f bulkfile] [-U default2] [-d PORTSDIR] [-abcCdprRtTuv] \\
-               file.diff file2.diff ...
+               file.diff cat/port ...
 
 Parameters:
     -a     --  Do everything except revert and port test (-ptf build.ports.txt)
@@ -316,15 +316,18 @@ fi
 
 # Set patchfile path #
 cd "${PORTSDIR}"
-for file in "${@}"; do
-	if [ -f "$file" ]; then
+for arg in "${@}"; do
+	if [ -f "$arg" ]; then
 		PATCH_FILE="${PATCH_FILE}
-$file"
-	elif [ -f "${CURDIR}/$file" ]; then
+$arg"
+	elif [ -f "${CURDIR}/$arg" ]; then
 		PATCH_FILE="${PATCH_FILE}
-${CURDIR}/$file"
+${CURDIR}/$arg"
+	elif [ -d "${PORTSDIR}/$arg" ]; then
+		BUILD_PORT="${BUILD_PORT}
+$arg"
 	else
-		echo "$file not found" && exit 1
+		echo "$arg not found" && exit 1
 	fi
 done
 
@@ -563,7 +566,9 @@ cd ${PORTSDIR}
 BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u`"
 else
 [ -z "${PATCH_FILES_LIST}" ] && filelist
-BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u`"
+BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//'`"
+BUILD_LIST="`echo "${BUILD_LIST}
+${BUILD_PORT}" | grep -o '.*' | sort -u`"
 fi
 }
 
