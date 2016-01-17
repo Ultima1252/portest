@@ -602,7 +602,7 @@ if [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 		${PORT} ${PORT_ARGS}
 	done
 elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
-	check_command "${TMUX}" "Try installing it, pkg install tmux"
+	check_command "${TMUX_COMMAND}" "Try installing it, pkg install tmux"
 	[ -z ${TMUX_SESSION} ] && check_command "${OPENSSL}" "Try installing it, pkg install openssl"
 	[ -z "${BUILD_LIST}" ] && buildlist
 	: ${TMUX_SESSION:="portest-`${OPENSSL} ${OPENSSL_ARGS}`"}
