@@ -30,7 +30,7 @@ PORTEST_VERSION="0.1.2"
 
 usage() {
 	cat << EOF
-Usage: portest [-m git] [-f bulkfile] [-U default2] [-d PORTSDIR] [-abcCdprRtTuv] \\
+Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] [-abcCdprRtTuv] \\
                file.diff cat/port ...
 
 Parameters:
@@ -56,15 +56,16 @@ Parameters:
 Options:
     -b     --  Generate the list of cat/ports based on port tree
                instead of diff, git and svn only, slow
-    -C     --  Check, Will still make backups and files required
-               to apply patches but will not apply them
+    -C     --  Check only, will not touch port tree, only vaild with -p
+               git may display errors if files do not exist,
+               these files are created without this option
     -d     --  Sets PORTSDIR, -U overrides this option
     -j     --  Jails used for poudriere, if multiple are used
                must be in "" with a space as a seperator,
                only used with -T option
     -m     --  Repo method, only used with -c valid methods are
                git,git+https,git+ssh,svn,svn+file,svn+http,
-               svn+https,svn+ssh,portsnap  default method is git
+               svn+https,svn+ssh,portsnap default method is git
     -U     --  Sets USE_POUDRIERE="YES" and sets port tree to use
 
 By default, (no options) portest does nothing
@@ -484,7 +485,7 @@ for patchfile in ${UNI_PATCH_FILE}; do
 	patchfile_check "$patchfile" "${MAX_STRIP_COUNT}" "${STRIP_COUNT}"
 done
 PATCH_FILES_LIST="`echo "${PATCH_FILES_LIST}
-${CAT_PORT}" | grep -o '.*' | sort -u`"
+${CAT_PORT}" | sort -u`"
 }
 
 folderlist() {
@@ -498,30 +499,31 @@ folderlist() {
 ### Patch Tree ###
 if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	[ -z "${PATCH_FOLDER_LIST}" ] && folderlist
-	case ${REPO_TYPE} in
-	portsnap*)	mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
-			mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort -u`
-			cd ${PORTSDIR}
-			for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
-				! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
-			done
-			for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\/// ; s/distfiles.*//'`; do
-				! [ -f "${BACKUPDIR}/$file" ] && cp -a "${PORTSDIR}/$file" "${BACKUPDIR}/$file" >/dev/null 2>&1
-			done
-			for dir in `echo "${PATCH_FOLDER_LIST}"`; do
-				! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
-			done
-			for dir in `echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$//' | sort -u`; do
-				! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
-			done ;;
-	git*)		for dir in `echo "${PATCH_FOLDER_LIST}"`; do
-				! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
-			done
-			for file in `echo "${PATCH_FILES_LIST}"`; do
-				! [ -f "${PORTSDIR}/$file" ] && touch "${PORTSDIR}/$file"
-			done ;;
-	svn*)	;;
-	esac
+	if [ "${CHECK_ONLY}" -ne "1" ]; then
+		case ${REPO_TYPE} in
+		portsnap*)	mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
+				mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort -u`
+				cd ${PORTSDIR}
+				for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
+					! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
+				done
+				for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\/// ; s/distfiles.*//'`; do
+					! [ -f "${BACKUPDIR}/$file" ] && cp -a "${PORTSDIR}/$file" "${BACKUPDIR}/$file" >/dev/null 2>&1
+				done
+				for dir in `echo "${PATCH_FOLDER_LIST}"`; do
+					! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
+				done
+				for dir in `echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$//' | sort -u`; do
+					! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
+				done ;;
+		git*)		for dir in `echo "${PATCH_FOLDER_LIST}"`; do
+					! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
+				done
+				for file in `echo "${PATCH_FILES_LIST}"`; do
+					! [ -f "${PORTSDIR}/$file" ] && touch "${PORTSDIR}/$file"
+				done ;;
+		esac
+	fi
 	cd ${PORTSDIR}
 	[ -n "${UNI_PATCH_FILE}" ] && patchfile_patch "${UNI_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
 	case ${REPO_TYPE} in
@@ -552,10 +554,11 @@ buildlist() {
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 cd ${PORTSDIR}
 BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$//' | sort -u`"
+[ -z "${CAT_PORT}" ] && BUILD_LIST="`echo "${BUILD_LIST}
+${CAT_PORT}" | grep '.*' | sort -u`"
 else
 [ -z "${PATCH_FILES_LIST}" ] && filelist
-BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$//'`"
-BUILD_LIST="`echo "${BUILD_LIST}" | sort -u`"
+BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$//' | sort -u`"
 fi
 }
 
