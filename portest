@@ -450,7 +450,7 @@ for file in $1; do
 	for pos in `echo $2 | awk "{ print ${DOLLARSIGN}${POS} }"`; do
 		case ${REPO_TYPE} in
 		svn*)	PATCH_OUTPUT="${PATCH_OUTPUT}
-"`${SVN} ${SVN_PATCH_ARGS} ${SVN_CHECK_ARGS} --strip $pos "$file" "${PORTSDIR}" 2>&1` ;;
+"`${SVN} ${SVN_PATCH_ARGS} ${SVN_CHECK_ARGS} --strip $pos "$file" "${PORTSDIR}" 2>&1 | grep '^. '` ;;
 		git*)	PATCH_OUTPUT="${PATCH_OUTPUT}
 "`${GIT} ${GIT_APPLY_ARGS} ${GIT_CHECK_ARGS} -p$pos "$file" 2>&1` ;;
 		portsnap*)	PATCH_OUTPUT="${PATCH_OUTPUT}
