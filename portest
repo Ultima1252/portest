@@ -490,9 +490,9 @@ ${CAT_PORT}" | sort -u`"
 
 folderlist() {
 [ -z "${PATCH_FILES_LIST}" ] && filelist
-[ -n "${PATCH_FILES_LIST}" ] && PATCH_FOLDER_LIST="`echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$//'`"
+[ -n "${PATCH_FILES_LIST}" ] && PATCH_FOLDER_LIST="`echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//'`"
 [ -n "${PATCH_FOLDER_LIST}" ] && PATCH_FOLDER_LIST="${PATCH_FOLDER_LIST}
-"`echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/*[^/]*\/*[^/]*\/' | sed 's/\/$//'`
+"`echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/[^/]*\/' | sed 's/\/$//'`
 [ -n "${PATCH_FOLDER_LIST}" ] && PATCH_FOLDER_LIST="`echo "${PATCH_FOLDER_LIST}" | sort -u`"
 }
 
@@ -502,7 +502,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	if [ "${CHECK_ONLY}" -ne "1" ]; then
 		case ${REPO_TYPE} in
 		portsnap*)	mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
-				mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort -u`
+				mkdir -p `echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$// ; s/[^/]*$//' | sort -u`
 				cd ${PORTSDIR}
 				for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
 					! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
@@ -513,7 +513,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 				for dir in `echo "${PATCH_FOLDER_LIST}"`; do
 					! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
 				done
-				for dir in `echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$//' | sort -u`; do
+				for dir in `echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u`; do
 					! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
 				done ;;
 		git*)		for dir in `echo "${PATCH_FOLDER_LIST}"`; do
@@ -553,12 +553,12 @@ fi
 buildlist() {
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 cd ${PORTSDIR}
-BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$//' | grep -v "[^/]" | sort -u`"
+BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | grep -v "[^/]" | sort -u`"
 [ -z "${CAT_PORT}" ] && BUILD_LIST="`echo "${BUILD_LIST}
 ${CAT_PORT}" | grep '.*' | sort -u`"
 else
 [ -z "${PATCH_FILES_LIST}" ] && filelist
-BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/*[^/]*\/' | sed 's/\/$//' | grep "/" | sort -u`"
+BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | grep "/" | sort -u`"
 fi
 }
 
@@ -665,7 +665,7 @@ case ${REPO_TYPE} in
 			[ -z "${BUILD_LIST}" ] && buildlist
 # Wierd cases where svn won't see short filenames in list.    #
 # This seems to be an svn bug, this list helps in those cases #
-			PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[^/]*\/*[^/]*\/*[^/]*'`"
+			PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[^/]*\/[^/]*\/[^/]*'`"
 			for file in ${BUILD_LIST}; do
 				rm -rf "${PORTSDIR}/$file"
 			done
