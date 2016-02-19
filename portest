@@ -40,11 +40,11 @@ Parameters:
     -p     --  Patch, will exit on fail with output
                portsnap will create a backup directory
                which is used on soft reverts (-r) and updates (-u)
-    -r     --  Soft Revert, quick and effective
+    -r     --  Revert repo, quick and effective
                portsnap uses backup created when patch (-p) is used, fast
                git (-r) is same as (-R) see below
                svn reverts all files from input patchfiles, fast
-    -R     --  Hard Revert, portsnap will rebuild tree, very slow
+    -R     --  Reset repo, portsnap will rebuild tree, very slow
                git does hard reset and cleans all files, fast
                svn removed all files via status and revert -R, very slow!!
     -t     --  Test with portlint
@@ -76,8 +76,8 @@ EOF
 ALL="0"
 POUDRIERE_BULK="0"
 DO_PATCH="0"
-REVERT_SOFT="0"
-REVERT_HARD="0"
+REVERT_REPO="0"
+RESET_REPO="0"
 TEST_PORTLINT="0"
 TEST_BUILD="0"
 REPO_BUILD_LIST="0"
@@ -107,9 +107,9 @@ while getopts ":abcCd:j:f:m:prRtTuU:v" FLAG; do
 	p)
 		DO_PATCH="1" ;;
 	r)
-		REVERT_SOFT="1" ;;
+		REVERT_REPO="1" ;;
 	R)
-		REVERT_HARD="1" ;;
+		RESET_REPO="1" ;;
 	t)
 		TEST_PORTLINT="1" ;;
 	T)
@@ -133,7 +133,7 @@ done
 shift "$((OPTIND-1))"
 
 if [ ${REPO_BUILD_LIST} -ne 1 ]; then
-[ $(( ALL + POUDRIERE_BULK + DO_PATCH + REVERT_SOFT + TEST_PORTLINT + TEST_BUILD )) -ge 1 ] && [ $# -lt 1 ] && usage
+[ $(( ALL + POUDRIERE_BULK + DO_PATCH + REVERT_REPO + TEST_PORTLINT + TEST_BUILD )) -ge 1 ] && [ $# -lt 1 ] && usage
 elif [ $(( DO_PATCH )) -ge 1 ] && [ $# -lt 1 ]; then
 	usage;
 fi
@@ -345,6 +345,7 @@ git_revert() {
 ${GIT} ${GIT_RESET_ARGS}
 ${GIT} ${GIT_CLEANX_ARGS}
 ${GIT} ${GIT_CLEAN_ARGS}
+REVERT_REPO="0"
 }
 
 portsnap_soft_revert() {
@@ -367,6 +368,7 @@ done
 cd ${PORTSDIR}
 rm -r "${BACKUPDIR}"
 rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+REVERT_REPO="0"
 }
 
 svn_hard_revert() {
@@ -376,6 +378,7 @@ for file in `${SVN} status | awk '{ print $(NF) }'`; do
 done
 ${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
 rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+REVERT_REPO="0"
 }
 
 ### Update Repo ###
@@ -383,11 +386,11 @@ if [ "${UPDATE_REPO}" -eq "1" ]; then
 cd ${PORTSDIR}
 	case ${REPO_TYPE} in
 		svn)
-			svn_hard_revert
+			[ "${REVERT_REPO}" -eq "1" ] && svn_hard_revert
 			${SVN} ${SVN_UPDATE_ARGS}
 		;;
 		git)
-			git_revert
+			[ "${REVERT_REPO}" -eq "1" ] && git_revert
 			${GIT} ${GIT_UPDATE_ARGS}
 		;;
 		portsnap)
@@ -650,7 +653,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	if [ "$?" -ne 0 ]; then
 		${TMUX_COMMAND} switch -t "${TMUX_SESSION}"
 	fi
-	if [ "${REVERT_SOFT}" -eq "1" ] || [ "${REVERT_HARD}" -eq "1" ]; then
+	if [ "${REVERT_REPO}" -eq "1" ] || [ "${RESET_REPO}" -eq "1" ]; then
 		while [ "`${TMUX_COMMAND} list-sessions -F \#S | grep -com1 "${TMUX_SESSION}"`" -eq "1" ]; do
 			sleep 10
 		done
@@ -660,7 +663,7 @@ fi
 ### Revert Patch ###
 cd ${PORTSDIR}
 case ${REPO_TYPE} in
-	svn*)	if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
+	svn*)	if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 			[ -z "${BUILD_LIST}" ] && buildlist
 # Wierd cases where svn won't see short filenames in list.    #
 # This seems to be an svn bug, this list helps in those cases #
@@ -675,16 +678,16 @@ case ${REPO_TYPE} in
 			[ -n "${PATCH_FILES_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
 			[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
 			rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-		elif [ "${REVERT_HARD}"  -eq "1" ]; then
+		elif [ "${RESET_REPO}"  -eq "1" ]; then
 			svn_hard_revert
 		fi ;;
-	git*)	if [ "${REVERT_SOFT}" -eq "1" ] || [ "${REVERT_HARD}" -eq "1" ]; then
+	git*)	if [ "${REVERT_REPO}" -eq "1" ] || [ "${RESET_REPO}" -eq "1" ]; then
 			git_revert
 		fi ;;
-	portsnap*)	if [ "${REVERT_SOFT}" -eq "1" ] && [ "${REVERT_HARD}" -ne "1" ]; then
+	portsnap*)	if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 				! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
 				portsnap_soft_revert
-			elif [ "${REVERT_HARD}"  -eq "1" ]; then
+			elif [ "${RESET_REPO}"  -eq "1" ]; then
 				${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
 				cd ${PORTSDIR}
 				rm -rf "${BACKUPDIR}"
