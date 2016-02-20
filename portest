@@ -134,7 +134,7 @@ done
 shift "$((OPTIND-1))"
 
 if [ ${REPO_BUILD_LIST} -ne 1 ]; then
-[ $(( ALL + POUDRIERE_BULK + DO_PATCH + REVERT_REPO + TEST_PORTLINT + TEST_BUILD )) -ge 1 ] && [ $# -lt 1 ] && usage
+[ $(( ALL + POUDRIERE_BULK + DO_PATCH + TEST_PORTLINT + TEST_BUILD )) -ge 1 ] && [ $# -lt 1 ] && usage
 elif [ $(( DO_PATCH )) -ge 1 ] && [ $# -lt 1 ]; then
 	usage;
 fi
@@ -276,7 +276,10 @@ cd ${PORTSDIR} && PORTSDIR="`pwd`"
 : ${BACKUPDIR:="${PORTSDIR}/.bak"}
 [ "`head -1 "${PORTSDIR}/README" | grep -com1 \"FreeBSD Ports Collection\"`" -ne "1" ] && echo "PORTSDIR is set to an incorrect directory" && exit 1
 # Check PORTSDIR for svn or git tree #
-[ -d "${PORTSDIR}/.svn" ] && check_svn && REPO_TYPE="svn" REPO="${SVN}" REPO_STATUS="status"
+if [ -d "${PORTSDIR}/.svn" ]; then
+	check_svn && REPO_TYPE="svn" REPO="${SVN}" REPO_STATUS="status"
+	[ $(( ${REVERT_REPO} + ${RESET_REPO} )) -eq 1 ] && [ $# -lt 1 ] && usage
+fi
 [ -d "${PORTSDIR}/.git" ] && check_command "${GIT}" "Try installing it, pkg install git" && REPO_TYPE="git" REPO="${GIT}" REPO_STATUS="status -s"
 # If not, use portsnap #
 if [ -z "${REPO_TYPE}" ]; then
