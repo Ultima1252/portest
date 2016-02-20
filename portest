@@ -108,7 +108,8 @@ while getopts ":abcCd:j:f:m:prRtTuU:v" FLAG; do
 		DO_PATCH="1" ;;
 	r)
 		REVERT_REPO="1" ;;
-	R)
+	R)	
+		REVERT_REPO="1"
 		RESET_REPO="1" ;;
 	t)
 		TEST_PORTLINT="1" ;;
@@ -342,36 +343,47 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 fi
 
 git_revert() {
+if [ "${REVERT_REPO}" -eq "1" ]; then
 ${GIT} ${GIT_RESET_ARGS}
 ${GIT} ${GIT_CLEANX_ARGS}
 ${GIT} ${GIT_CLEAN_ARGS}
 REVERT_REPO="0"
+fi
 }
 
-portsnap_soft_revert() {
-cd ${BACKUPDIR}
-for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
-	rm -rf "${PORTSDIR}/$dir"
-	mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
-done
-EMPTY_FOLDERS="`find ./ -type d -mindepth 2 -maxdepth 3 -empty | sed 's/^\.\///'`"
-for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
-	rm -rf "${PORTSDIR}/$dir"
-	[ -n "${EMPTY_FOLDERS}" ] && rmdir -p `echo "${EMPTY_FOLDERS}"` >/dev/null 2>&1
-	[ -n "${EMPTY_FOLDERS}" ] && unset EMPTY_FOLDERS
-	[ -d "${BACKUPDIR}/$dir" ] && mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
-done
-for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
-	rm -f "${PORTSDIR}/$file"
-	mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
-done
-cd ${PORTSDIR}
-rm -r "${BACKUPDIR}"
-rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+portsnap_revert() {
+if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
+	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
+	cd ${BACKUPDIR}
+	for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
+		rm -rf "${PORTSDIR}/$dir"
+		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
+	done
+	local EMPTY_FOLDERS="`find ./ -type d -mindepth 2 -maxdepth 3 -empty | sed 's/^\.\///'`"
+	for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
+		rm -rf "${PORTSDIR}/$dir"
+		[ -n "${EMPTY_FOLDERS}" ] && rmdir -p `echo "${EMPTY_FOLDERS}"` >/dev/null 2>&1
+		[ -n "${EMPTY_FOLDERS}" ] && unset EMPTY_FOLDERS
+		[ -d "${BACKUPDIR}/$dir" ] && mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
+	done
+	for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
+		rm -f "${PORTSDIR}/$file"
+		mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
+	done
+	cd ${PORTSDIR}
+	rm -r "${BACKUPDIR}"
+	rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}"  -eq "1" ]; then
+	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
+	cd ${PORTSDIR}
+	rm -rf "${BACKUPDIR}"
+	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+fi
 REVERT_REPO="0"
 }
 
 svn_hard_revert() {
+if [ "${REVERT_REPO}" -eq "1" ]; then
 cd ${PORTSDIR}
 for file in `${SVN} status | awk '{ print $(NF) }'`; do
 	rm -rf "${PORTSDIR}/$file"
@@ -379,23 +391,19 @@ done
 ${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
 rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
 REVERT_REPO="0"
+fi
 }
 
 ### Update Repo ###
 if [ "${UPDATE_REPO}" -eq "1" ]; then
 cd ${PORTSDIR}
 	case ${REPO_TYPE} in
-		svn)
-			[ "${REVERT_REPO}" -eq "1" ] && svn_hard_revert
-			${SVN} ${SVN_UPDATE_ARGS}
-		;;
-		git)
-			[ "${REVERT_REPO}" -eq "1" ] && git_revert
-			${GIT} ${GIT_UPDATE_ARGS}
-		;;
-		portsnap)
-			[ -d "${BACKUPDIR}" ] && portsnap_soft_revert
-			${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_UPDATE_ARGS}
+		svn)		svn_hard_revert
+				${SVN} ${SVN_UPDATE_ARGS} ;;
+		git)		git_revert
+				${GIT} ${GIT_UPDATE_ARGS} ;;
+		portsnap)	portsnap_revert
+				${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_UPDATE_ARGS} ;;
 	esac
 fi
 
@@ -681,16 +689,6 @@ case ${REPO_TYPE} in
 		elif [ "${RESET_REPO}"  -eq "1" ]; then
 			svn_hard_revert
 		fi ;;
-	git*)	if [ "${REVERT_REPO}" -eq "1" ] || [ "${RESET_REPO}" -eq "1" ]; then
-			git_revert
-		fi ;;
-	portsnap*)	if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
-				! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
-				portsnap_soft_revert
-			elif [ "${RESET_REPO}"  -eq "1" ]; then
-				${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
-				cd ${PORTSDIR}
-				rm -rf "${BACKUPDIR}"
-				rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-			fi ;;
+	git*)		git_revert ;;
+	portsnap*)	portsnap_revert ;;
 esac
