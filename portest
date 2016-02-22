@@ -486,24 +486,41 @@ if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 	cd ${PORTSDIR}
 	rm -r "${BACKUPDIR}"
 	rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*" | grep -v distfiles` >/dev/null 2>&1
+	REVERT_REPO="0"
 elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}"  -eq "1" ]; then
 	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
 	cd ${PORTSDIR}
 	rm -rf "${BACKUPDIR}"
 	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+	REVERT_REPO="0"
 fi
-REVERT_REPO="0"
 }
 
 svn_hard_revert() {
-if [ "${REVERT_REPO}" -eq "1" ]; then
-cd ${PORTSDIR}
-for file in `${SVN} status | awk '{ print $(NF) }'`; do
-	rm -rf "${PORTSDIR}/$file"
-done
-${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
-rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-REVERT_REPO="0"
+if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -eq "1" ]; then
+	cd ${PORTSDIR}
+	for file in `${SVN} status | awk '{ print $(NF) }'`; do
+		rm -rf "${PORTSDIR}/$file"
+	done
+	${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
+	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+	REVERT_REPO="0"
+elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
+	[ -z "${BUILD_LIST}" ] && buildlist
+# Wierd cases where svn won't see short filenames in list.    #
+# This seems to be an svn bug, this list helps in those cases #
+	PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[^/]*\/[^/]*\/[^/]*'`"
+	for file in ${BUILD_LIST}; do
+		rm -rf "${PORTSDIR}/$file"
+	done
+	for file in ${PATCH_FILES_LIST}; do
+		rm -rf "${PORTSDIR}/$file"
+	done
+	[ -n "${BUILD_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${BUILD_LIST}
+	[ -n "${PATCH_FILES_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
+	[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
+	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+	REVERT_REPO="0"
 fi
 }
 
@@ -672,24 +689,7 @@ fi
 ### Revert Patch ###
 cd ${PORTSDIR}
 case ${REPO_TYPE} in
-	svn*)	if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
-			[ -z "${BUILD_LIST}" ] && buildlist
-# Wierd cases where svn won't see short filenames in list.    #
-# This seems to be an svn bug, this list helps in those cases #
-			PATCH_FILES_FILTERED="`echo "${PATCH_FILES_LIST}" | grep -v '^[^/]*\/[^/]*\/[^/]*'`"
-			for file in ${BUILD_LIST}; do
-				rm -rf "${PORTSDIR}/$file"
-			done
-			for file in ${PATCH_FILES_LIST}; do
-				rm -rf "${PORTSDIR}/$file"
-			done
-			[ -n "${BUILD_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${BUILD_LIST}
-			[ -n "${PATCH_FILES_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
-			[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
-			rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-		elif [ "${RESET_REPO}"  -eq "1" ]; then
-			svn_hard_revert
-		fi ;;
+	svn*)		svn_hard_revert ;;
 	git*)		git_revert ;;
 	portsnap*)	portsnap_revert ;;
 esac
