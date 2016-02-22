@@ -64,8 +64,8 @@ Options:
                must be in "" with a space as a seperator,
                only used with -T option
     -m     --  Repo method, only used with -c valid methods are
-               git,git+https,git+ssh,svn,svn+file,svn+http,
-               svn+https,svn+ssh,portsnap default method is git
+               git,git+https,git+ssh,svn,svn+http,svn+https,
+               svn+ssh,portsnap default method is git
     -U     --  Sets USE_POUDRIERE="YES" and sets port tree to use
 
 By default, (no options) portest does nothing
@@ -148,7 +148,6 @@ if [ "${CREATE_REPO}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	git+https) PROTO="https" ;;
 	git+ssh) PROTO="git" ;;
 	svn) PROTO="svn" ;;
-	svn+file) PROTO="file" ;;
 	svn+http) PROTO="http" ;;
 	svn+https) PROTO="https" ;;
 	svn+ssh) PROTO="svn+ssh" ;;
