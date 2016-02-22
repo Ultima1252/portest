@@ -496,7 +496,7 @@ elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}"  -eq "1" ]; then
 fi
 }
 
-svn_hard_revert() {
+svn_revert() {
 if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -eq "1" ]; then
 	cd ${PORTSDIR}
 	for file in `${SVN} status | awk '{ print $(NF) }'`; do
@@ -528,7 +528,7 @@ fi
 if [ "${UPDATE_REPO}" -eq "1" ]; then
 cd ${PORTSDIR}
 	case ${REPO_TYPE} in
-		svn)		svn_hard_revert
+		svn)		svn_revert
 				${SVN} ${SVN_UPDATE_ARGS} ;;
                 git)		git_revert
 				${GIT} ${GIT_UPDATE_ARGS} ;;
@@ -689,7 +689,7 @@ fi
 ### Revert Patch ###
 cd ${PORTSDIR}
 case ${REPO_TYPE} in
-	svn*)		svn_hard_revert ;;
+	svn*)		svn_revert ;;
 	git*)		git_revert ;;
 	portsnap*)	portsnap_revert ;;
 esac
