@@ -375,7 +375,7 @@ if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 	done
 	cd ${PORTSDIR}
 	rm -r "${BACKUPDIR}"
-	rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+	rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*" | grep -v distfiles` >/dev/null 2>&1
 elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}"  -eq "1" ]; then
 	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
 	cd ${PORTSDIR}
