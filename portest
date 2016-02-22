@@ -351,7 +351,7 @@ add_patchfile() {
 	git*)	PATCH_FILES_LIST="${PATCH_FILES_LIST} 
 "`echo "$3" | grep '\.\.\.$' | awk '{ print $(NF) }'| sed 's/\.\.\.$//'` ;;
 	portsnap*)	PATCH_FILES_LIST="${PATCH_FILES_LIST}
-"`${PATCH} ${PATCH_ARGS} -C -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1" | grep -A 2 '\-\-\-\-' | grep '\.\.\.$' | awk '{ print $3 }'` ;;
+"`${PATCH} ${PATCH_ARGS} -C -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1" | grep -A 2 '\-\-\-\-' | grep '\.\.\.$' | awk '{ print $3 }' | grep -v '^to$'` ;;
 	esac
 	PATCH_STRIP_COUNT="${PATCH_STRIP_COUNT}
 $2"
