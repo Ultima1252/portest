@@ -344,70 +344,6 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 	done
 fi
 
-git_revert() {
-if [ "${REVERT_REPO}" -eq "1" ]; then
-${GIT} ${GIT_RESET_ARGS}
-${GIT} ${GIT_CLEAN_ARGS}
-REVERT_REPO="0"
-fi
-}
-
-portsnap_revert() {
-if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
-	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
-	cd ${BACKUPDIR}
-	for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
-		rm -rf "${PORTSDIR}/$dir"
-		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
-	done
-	local EMPTY_FOLDERS="`find ./ -type d -mindepth 2 -maxdepth 3 -empty | sed 's/^\.\///'`"
-	for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
-		rm -rf "${PORTSDIR}/$dir"
-		[ -n "${EMPTY_FOLDERS}" ] && rmdir -p `echo "${EMPTY_FOLDERS}"` >/dev/null 2>&1
-		[ -n "${EMPTY_FOLDERS}" ] && unset EMPTY_FOLDERS
-		[ -d "${BACKUPDIR}/$dir" ] && mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
-	done
-	for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
-		rm -f "${PORTSDIR}/$file"
-		mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
-	done
-	cd ${PORTSDIR}
-	rm -r "${BACKUPDIR}"
-	rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*" | grep -v distfiles` >/dev/null 2>&1
-elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}"  -eq "1" ]; then
-	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
-	cd ${PORTSDIR}
-	rm -rf "${BACKUPDIR}"
-	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-fi
-REVERT_REPO="0"
-}
-
-svn_hard_revert() {
-if [ "${REVERT_REPO}" -eq "1" ]; then
-cd ${PORTSDIR}
-for file in `${SVN} status | awk '{ print $(NF) }'`; do
-	rm -rf "${PORTSDIR}/$file"
-done
-${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
-rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-REVERT_REPO="0"
-fi
-}
-
-### Update Repo ###
-if [ "${UPDATE_REPO}" -eq "1" ]; then
-cd ${PORTSDIR}
-	case ${REPO_TYPE} in
-		svn)		svn_hard_revert
-				${SVN} ${SVN_UPDATE_ARGS} ;;
-		git)		git_revert
-				${GIT} ${GIT_UPDATE_ARGS} ;;
-		portsnap)	portsnap_revert
-				${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_UPDATE_ARGS} ;;
-	esac
-fi
-
 add_patchfile() {
 	case ${REPO_TYPE} in
 	svn*)	PATCH_FILES_LIST="${PATCH_FILES_LIST}
@@ -507,6 +443,83 @@ folderlist() {
 [ -n "${PATCH_FOLDER_LIST}" ] && PATCH_FOLDER_LIST="`echo "${PATCH_FOLDER_LIST}" | sort -u`"
 }
 
+# Generate a list of ports for poudriere to build #
+buildlist() {
+if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
+cd ${PORTSDIR}
+BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | grep -v "[^/]" | sort -u`"
+[ -z "${CAT_PORT}" ] && BUILD_LIST="`echo "${BUILD_LIST}
+${CAT_PORT}" | grep '.*' | sort -u`"
+else
+[ -z "${PATCH_FILES_LIST}" ] && filelist
+BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | grep "/" | sort -u`"
+fi
+}
+
+git_revert() {
+if [ "${REVERT_REPO}" -eq "1" ]; then
+${GIT} ${GIT_RESET_ARGS}
+${GIT} ${GIT_CLEAN_ARGS}
+REVERT_REPO="0"
+fi
+}
+
+portsnap_revert() {
+if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
+	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
+	cd ${BACKUPDIR}
+	for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
+		rm -rf "${PORTSDIR}/$dir"
+		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
+	done
+	local EMPTY_FOLDERS="`find ./ -type d -mindepth 2 -maxdepth 3 -empty | sed 's/^\.\///'`"
+	for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
+		rm -rf "${PORTSDIR}/$dir"
+		[ -n "${EMPTY_FOLDERS}" ] && rmdir -p `echo "${EMPTY_FOLDERS}"` >/dev/null 2>&1
+		[ -n "${EMPTY_FOLDERS}" ] && unset EMPTY_FOLDERS
+		[ -d "${BACKUPDIR}/$dir" ] && mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
+	done
+	for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
+		rm -f "${PORTSDIR}/$file"
+		mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
+	done
+	cd ${PORTSDIR}
+	rm -r "${BACKUPDIR}"
+	rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*" | grep -v distfiles` >/dev/null 2>&1
+elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}"  -eq "1" ]; then
+	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
+	cd ${PORTSDIR}
+	rm -rf "${BACKUPDIR}"
+	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+fi
+REVERT_REPO="0"
+}
+
+svn_hard_revert() {
+if [ "${REVERT_REPO}" -eq "1" ]; then
+cd ${PORTSDIR}
+for file in `${SVN} status | awk '{ print $(NF) }'`; do
+	rm -rf "${PORTSDIR}/$file"
+done
+${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
+rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
+REVERT_REPO="0"
+fi
+}
+
+### Update Repo ###
+if [ "${UPDATE_REPO}" -eq "1" ]; then
+cd ${PORTSDIR}
+	case ${REPO_TYPE} in
+		svn)		svn_hard_revert
+				${SVN} ${SVN_UPDATE_ARGS} ;;
+                git)		git_revert
+				${GIT} ${GIT_UPDATE_ARGS} ;;
+		portsnap)	portsnap_revert
+				${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_UPDATE_ARGS} ;;
+	esac
+fi
+
 ### Patch Tree ###
 if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	[ -z "${PATCH_FOLDER_LIST}" ] && folderlist
@@ -559,19 +572,6 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` 2>/dev/null ;;
 	esac
 fi
-
-# Generate a list of ports for poudriere to build #
-buildlist() {
-if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
-cd ${PORTSDIR}
-BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | grep -v "[^/]" | sort -u`"
-[ -z "${CAT_PORT}" ] && BUILD_LIST="`echo "${BUILD_LIST}
-${CAT_PORT}" | grep '.*' | sort -u`"
-else
-[ -z "${PATCH_FILES_LIST}" ] && filelist
-BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | grep "/" | sort -u`"
-fi
-}
 
 ### Bulk File ###
 if [ "$POUDRIERE_BULK" -eq "1" ]; then
