@@ -181,8 +181,7 @@ fi
 : ${SVN_UPDATE_ARGS:="update"}
 : ${GIT:="git"}
 : ${GIT_ADD_ARGS:="add -AN"}
-: ${GIT_CLEANX_ARGS:="clean -fd -f -X"}
-: ${GIT_CLEAN_ARGS:="clean -fd -f"}
+: ${GIT_CLEAN_ARGS:="clean -fd -f -x -e /distfiles -e /local -e /packages -e /INDEX-[0-9]* -e *~ -e *.sw[p-z]"}
 : ${GIT_CLONE_ARGS:="clone --depth 1 -b ${BRANCH} ${GIT_REPO_URL}"}
 : ${GIT_APPLY_ARGS:="apply --whitespace=nowarn"}
 : ${GIT_RESET_ARGS:="reset --hard"}
@@ -348,7 +347,6 @@ fi
 git_revert() {
 if [ "${REVERT_REPO}" -eq "1" ]; then
 ${GIT} ${GIT_RESET_ARGS}
-${GIT} ${GIT_CLEANX_ARGS}
 ${GIT} ${GIT_CLEAN_ARGS}
 REVERT_REPO="0"
 fi
