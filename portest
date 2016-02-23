@@ -443,12 +443,12 @@ folderlist() {
 buildlist() {
 if [ "${REPO_BUILD_LIST}" -eq "1" ]; then
 cd ${PORTSDIR}
-BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | grep -v "[^/]" | sort -u`"
+BUILD_LIST="`${REPO} ${REPO_STATUS} | awk '{ print $(NF) }' | grep -Eo '^[^A-Z][^/]+\/+[^/]+\/' | sed 's/\/$//' | grep "/" | sort -u`"
 [ -z "${CAT_PORT}" ] && BUILD_LIST="`echo "${BUILD_LIST}
 ${CAT_PORT}" | grep '.*' | sort -u`"
 else
 [ -z "${PATCH_FILES_LIST}" ] && filelist
-BUILD_LIST="`echo "${PATCH_FILES_LIST}" | sed 's/^[A-Z].*//' | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | grep "/" | sort -u`"
+BUILD_LIST="`echo "${PATCH_FILES_LIST}" | grep -Eo '^[^A-Z][^/]+\/+[^/]+\/' | sed 's/\/$//' | grep "/" | sort -u`"
 fi
 }
 
