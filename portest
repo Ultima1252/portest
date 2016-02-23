@@ -436,10 +436,7 @@ ${CAT_PORT}" | sort -u`"
 
 folderlist() {
 [ -z "${PATCH_FILES_LIST}" ] && filelist
-[ -n "${PATCH_FILES_LIST}" ] && PATCH_FOLDER_LIST="`echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//'`"
-[ -n "${PATCH_FOLDER_LIST}" ] && PATCH_FOLDER_LIST="${PATCH_FOLDER_LIST}
-"`echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/[^/]*\/' | sed 's/\/$//'`
-[ -n "${PATCH_FOLDER_LIST}" ] && PATCH_FOLDER_LIST="`echo "${PATCH_FOLDER_LIST}" | sort -u`"
+[ -n "${PATCH_FILES_LIST}" ] && PATCH_FOLDER_LIST="`echo "${PATCH_FILES_LIST}" | grep -Eo '^([^/]+\/+[^/]+\/+[^/]+\/|[^/]+\/+[^/]+\/)' | sed 's/\/$//' | sort -u`"
 }
 
 # Generate a list of ports for poudriere to build #
