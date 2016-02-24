@@ -101,7 +101,7 @@ while getopts ":abcCd:j:f:m:prRtTuU:v" FLAG; do
 		POUDRIERE_JAILS="${OPTARG}" ;;
 	f)
 		POUDRIERE_BULK="1"
-		POUDRIERE_BULK_FILE="${OPTARG}" ;;
+		BULK_FILE="${OPTARG}" ;;
 	m)	
 		METHOD="${OPTARG}" ;;
 	p)
@@ -577,14 +577,9 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 fi
 
 ### Bulk File ###
-if [ "$POUDRIERE_BULK" -eq "1" ]; then
+if [ "${POUDRIERE_BULK}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
-	cd "${CURDIR}"
-	echo "${BUILD_LIST}" >"${POUDRIERE_BULK_FILE}"
-elif [ "${ALL}" -eq "1" ]; then
-	[ -z "${BUILD_LIST}" ] && buildlist
-	cd "${CURDIR}"
-	echo "${BUILD_LIST}" >"${BULK_FILE}"
+	cd "${CURDIR}" && echo "${BUILD_LIST}" >"${BULK_FILE}"
 fi
 
 ### Portlint ###
