@@ -481,7 +481,6 @@ fi
 
 svn_revert() {
 if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -eq "1" ]; then
-	cd ${PORTSDIR}
 	for file in `${SVN} status | awk '{ print $(NF) }'`; do
 		rm -rf "${PORTSDIR}/$file"
 	done
