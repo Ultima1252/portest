@@ -393,7 +393,7 @@ while [ "$2" -ge "${STRIP_COUNT}" ]; do
 			fi
 		fi
 	fi
-		local STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
+	local STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
 done
 }
 
@@ -417,7 +417,7 @@ done
 filelist() {
 [ "${REPO_TYPE}" == "portsnap" ] && check_command "${PATCH}"
 for patchfile in ${UNI_PATCH_FILE}; do
-	local MAX_STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' |grep -Em1 '^(\+\+\+|---)[ ].*' | awk -F/ '{ print NF-1 }'`"
+	local MAX_STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' | grep -Em1 '^(\+\+\+|---)[ ].*' | awk -F/ '{ print NF-1 }'`"
 	local STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' | grep -Em1 '^(\+\+\+|---)[ ].*' | awk '{ print $2 }' | grep -co '^/'`"
 	patchfile_check "$patchfile" "${MAX_STRIP_COUNT}" "${STRIP_COUNT}"
 done
