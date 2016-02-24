@@ -459,11 +459,9 @@ if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 		rm -rf "${PORTSDIR}/$dir"
 		mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
 	done
-	local EMPTY_FOLDERS="`find ./ -type d -mindepth 2 -maxdepth 3 -empty | sed 's/^\.\///'`"
+	rmdir -p `find ./ -type d -mindepth 2 -maxdepth 3 -empty | sed 's/^\.\///'` >/dev/null 2>&1
 	for dir in `find ./ -type d -mindepth 2 -maxdepth 2 | sed 's/^\.\///'`; do
 		rm -rf "${PORTSDIR}/$dir"
-		[ -n "${EMPTY_FOLDERS}" ] && rmdir -p `echo "${EMPTY_FOLDERS}"` >/dev/null 2>&1
-		[ -n "${EMPTY_FOLDERS}" ] && unset EMPTY_FOLDERS
 		[ -d "${BACKUPDIR}/$dir" ] && mv "${BACKUPDIR}/$dir" "${PORTSDIR}/$dir"
 	done
 	for file in `find ./ -type f -maxdepth 2 | sed 's/^\.\///'`; do
