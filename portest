@@ -522,7 +522,11 @@ fi
 
 ### Patch Tree ###
 if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
-	[ -z "${PATCH_FOLDER_LIST}" ] && folderlist
+	if [ "${REPO_TYPE}" == "svn" ] || [ "${CHECK_ONLY}" -eq "1" ] ; then
+		[ -z "${PATCH_FILES_LIST}" ] && filelist
+	else
+		[ -z "${PATCH_FOLDER_LIST}" ] && folderlist
+	fi
 	if [ "${CHECK_ONLY}" -ne "1" ]; then
 		case ${REPO_TYPE} in
 		portsnap*)	mkdir -p ${BACKUPDIR} && cd ${BACKUPDIR}
@@ -562,14 +566,13 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
-		rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` 2>/dev/null ;;
+		[ "${CHECK_ONLY}" -ne "1" ] && rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` 2>/dev/null ;;
 	*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 rejects`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			echo "Patch Failed" && exit 1
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
-		cd ${PORTSDIR}
-		rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` 2>/dev/null ;;
+		[ "${CHECK_ONLY}" -ne "1" ] && cd ${PORTSDIR} && rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` 2>/dev/null ;;
 	esac
 fi
 
