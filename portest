@@ -360,24 +360,27 @@ patchfile_check() {
 local HIGHEST_SUCCESS="0"
 local HIGHEST_FAILED="0"
 local STRIP_COUNT="$3"
+local FILE="`cat "$1" | grep -v '/dev/null' | grep -Em1 '^(\+\+\+|---)[ ].*' | awk '{ print $2 }'`"
 cd ${PORTSDIR}
 while [ "$2" -ge "${STRIP_COUNT}" ]; do
-	case ${REPO_TYPE} in
-	svn*)	local OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" ${PORTSDIR}`"
-		local SUCCESS="`echo "${OUTPUT}" | grep -co '^.[ ][ ][ ]*'`"
-		local FAILED="`echo "${OUTPUT}" | grep -co '^Skipped'`"
-		[ "${STRIP_COUNT}" -eq "0" ] && [ "${FAILED}" -eq "0" ] && add_patchfile "$1" "${STRIP_COUNT}" "${OUTPUT}" && return ;;
-	git*)	local OUTPUT="`${GIT} ${GIT_APPLY_ARGS} -p${STRIP_COUNT} --check -v "$1" 2>&1`"
-		[ "$?" -eq "0" ] && add_patchfile "$1" "${STRIP_COUNT}" "${OUTPUT}" && return
-		[ "`echo "${OUTPUT}" | grep -com1 'patch does not apply'`" -ge "1" ] && add_patchfile "$1" "${STRIP_COUNT}" "${OUTPUT}" && return
-		local SUCCESS="`echo "${OUTPUT}" | grep -co '\.\.\.$'`"
-		local FAILED="`echo "${OUTPUT}" | grep -co ':'`"
-		local SUCCESS="$(( ${SUCCESS} - ${FAILED} ))" ;;
-	portsnap*)	local OUTPUT="`${PATCH} ${PATCH_ARGS} -sC -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1"`"
+	local check_file="`echo "${FILE}" | sed -E "s/^(\/)?([^\/]*\/){${STRIP_COUNT}}// ; s/\/.*//"`"
+	if [ -d "${PORTSDIR}/${check_file}" ]; then
+		case ${REPO_TYPE} in
+		svn*)	local OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" ${PORTSDIR}`"
+			local SUCCESS="`echo "${OUTPUT}" | grep -co '^.[ ][ ][ ]*'`"
+			local FAILED="`echo "${OUTPUT}" | grep -co '^Skipped'`"
+			[ "${STRIP_COUNT}" -eq "0" ] && [ "${FAILED}" -eq "0" ] && add_patchfile "$1" "${STRIP_COUNT}" "${OUTPUT}" && return ;;
+		git*)	local OUTPUT="`${GIT} ${GIT_APPLY_ARGS} -p${STRIP_COUNT} --check -v "$1" 2>&1`"
 			[ "$?" -eq "0" ] && add_patchfile "$1" "${STRIP_COUNT}" "${OUTPUT}" && return
-			local SUCCESS="100000"
-			local FAILED="`echo "${OUTPUT}" | grep -co '\.\.\.'`" ;;
-	esac
+			[ "`echo "${OUTPUT}" | grep -com1 'patch does not apply'`" -ge "1" ] && add_patchfile "$1" "${STRIP_COUNT}" "${OUTPUT}" && return
+			local SUCCESS="`echo "${OUTPUT}" | grep -co '\.\.\.$'`"
+			local FAILED="`echo "${OUTPUT}" | grep -co ':'`"
+			local SUCCESS="$(( ${SUCCESS} - ${FAILED} ))" ;;
+		portsnap*)	local OUTPUT="`${PATCH} ${PATCH_ARGS} -sC -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1"`"
+				[ "$?" -eq "0" ] && add_patchfile "$1" "${STRIP_COUNT}" "${OUTPUT}" && return
+				local SUCCESS="100000"
+				local FAILED="`echo "${OUTPUT}" | grep -co '\.\.\.'`" ;;
+		esac
 		[ "$(( ${HIGHEST_SUCCESS} - ${HIGHEST_FAILED} ))" -lt "$(( ${SUCCESS} - ${FAILED} ))" ] && local HIGHEST_SUCCESS="${SUCCESS}" local HIGHEST_FAILED="${FAILED}" local HIGHEST_STRIP_COUNT="${STRIP_COUNT}" local HIGHEST_OUTPUT="${OUTPUT}"
 		if [ "$2" -ge "${STRIP_COUNT}" ]; then
 			if [ "${HIGHEST_SUCCESS}" -gt "${HIGHEST_FAILED}" ]; then
@@ -386,6 +389,7 @@ while [ "$2" -ge "${STRIP_COUNT}" ]; do
 				echo Patchfile "$1" Failed, try a revert? && exit 1
 			fi
 		fi
+	fi
 		local STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
 done
 }
