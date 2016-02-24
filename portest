@@ -408,9 +408,7 @@ done
 }
 
 filelist() {
-case ${REPO_TYPE} in
-	portsnap*) check_command "${PATCH}" ;;
-esac
+[ "${REPO_TYPE}" == "portsnap" ] && check_command "${PATCH}"
 for patchfile in ${UNI_PATCH_FILE}; do
 	local MAX_STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' |grep -Em1 '^(\+\+\+|---)[ ].*' | awk -F/ '{ print NF-1 }'`"
 	case ${REPO_TYPE} in
