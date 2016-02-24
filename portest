@@ -350,7 +350,7 @@ add_patchfile() {
 	git*)	PATCH_FILES_LIST="${PATCH_FILES_LIST} 
 "`echo "$3" | grep '\.\.\.$' | awk '{ print $(NF) }'| sed 's/\.\.\.$//'` ;;
 	portsnap*)	PATCH_FILES_LIST="${PATCH_FILES_LIST}
-"`${PATCH} ${PATCH_ARGS} -C -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1" | grep -A 2 '\-\-\-\-' | grep '\.\.\.$' | awk '{ print $3 }' | grep -v '^to$'` ;;
+"`echo "$3" | grep -A 2 '\-\-\-\-' | grep '\.\.\.$' | awk '{ print $3 }' | grep -v '^to$'` ;;
 	esac
 	PATCH_STRIP_COUNT="${PATCH_STRIP_COUNT}
 $2"
@@ -380,10 +380,9 @@ while [ "$2" -ge "${STRIP_COUNT}" ]; do
 			local SUCCESS="`echo "${OUTPUT}" | grep -co '\.\.\.$'`"
 			local FAILED="`echo "${OUTPUT}" | grep -co ':'`"
 			local SUCCESS="$(( ${SUCCESS} - ${FAILED} ))" ;;
-		portsnap*)	local OUTPUT="`${PATCH} ${PATCH_ARGS} -sC -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1"`"
-				[ "$?" -eq "0" ] && add_patchfile "$1" "${STRIP_COUNT}" "${OUTPUT}" && return
-				local SUCCESS="100000"
-				local FAILED="`echo "${OUTPUT}" | grep -co '\.\.\.'`" ;;
+		portsnap*)	local OUTPUT="`${PATCH} ${PATCH_ARGS} -C -p${STRIP_COUNT} -d "${PORTSDIR}" -i "$1"`"
+				local SUCCESS="`echo "${OUTPUT}" | grep -co 'succeeded'`"
+				local FAILED="`echo "${OUTPUT}" | grep -Eco '[0-9]+ ignored'`" ;;
 		esac
 		[ "$(( ${HIGHEST_SUCCESS} - ${HIGHEST_FAILED} ))" -lt "$(( ${SUCCESS} - ${FAILED} ))" ] && local HIGHEST_SUCCESS="${SUCCESS}" local HIGHEST_FAILED="${FAILED}" local HIGHEST_STRIP_COUNT="${STRIP_COUNT}" local HIGHEST_OUTPUT="${OUTPUT}"
 		if [ "$2" -ge "${STRIP_COUNT}" ]; then
