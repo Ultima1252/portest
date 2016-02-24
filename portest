@@ -468,14 +468,12 @@ if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 		rm -f "${PORTSDIR}/$file"
 		mv "${BACKUPDIR}/$file" "${PORTSDIR}/$file"
 	done
-	cd ${PORTSDIR}
-	rm -r "${BACKUPDIR}"
+	cd ${PORTSDIR} && rm -rf "${BACKUPDIR}"
 	rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*" | grep -v distfiles` >/dev/null 2>&1
 	REVERT_REPO="0"
 elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}"  -eq "1" ]; then
 	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
-	cd ${PORTSDIR}
-	rm -rf "${BACKUPDIR}"
+	cd ${PORTSDIR} && rm -rf "${BACKUPDIR}"
 	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
 	REVERT_REPO="0"
 fi
