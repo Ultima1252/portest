@@ -414,9 +414,8 @@ esac
 for patchfile in ${UNI_PATCH_FILE}; do
 	local MAX_STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' |grep -Em1 '^(\+\+\+|---)[ ].*' | awk -F/ '{ print NF-1 }'`"
 	case ${REPO_TYPE} in
-		svn)	local STRIP_COUNT="0" ;;
-		git)	local STRIP_COUNT="0" ;;
-		*)	local STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' | grep -Em1 '^(\+\+\+|---)[ ].*' | awk '{ print $2 }' | grep -co '^/'`" ;;
+		portsnap*)	local STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' | grep -Em1 '^(\+\+\+|---)[ ].*' | awk '{ print $2 }' | grep -co '^/'`" ;;
+		*)		local STRIP_COUNT="0" ;;
 	esac
 	patchfile_check "$patchfile" "${MAX_STRIP_COUNT}" "${STRIP_COUNT}"
 done
