@@ -412,21 +412,11 @@ case ${REPO_TYPE} in
 	portsnap*) check_command "${PATCH}" ;;
 esac
 for patchfile in ${UNI_PATCH_FILE}; do
-	if [ "/dev/null" != "`cat "$patchfile" | grep -m1 '^+++[ ]' | awk '{ print $2 }'`" ]; then
-		local MAX_STRIP_COUNT="`cat "$patchfile" | grep -m1 '^+++[ ]' | awk '{ print $2 }'| awk -F/ '{ print NF-1 }'`"
-		local TRUE="1"
-	else
-		local MAX_STRIP_COUNT="`cat "$patchfile" | grep -m1 '^---[ ]' | awk '{ print $2 }'| awk -F/ '{ print NF-1 }'`"
-		local TRUE="0"
-	fi
+	local MAX_STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' |grep -Em1 '^(\+\+\+|---)[ ].*' | awk -F/ '{ print NF-1 }'`"
 	case ${REPO_TYPE} in
-		svn) local STRIP_COUNT="0" ;;
-		git) local STRIP_COUNT="0" ;;
-		*)	if [ "${TRUE}" -eq "1" ]; then
-				local STRIP_COUNT="`cat "$patchfile" | grep -m1 '^+++[ ]' | awk '{ print $2 }' | grep -co '^/'`"
-			else
-				local STRIP_COUNT="`cat "$patchfile" | grep -m1 '^---[ ]' | awk '{ print $2 }' | grep -co '^/'`"
-			fi;
+		svn)	local STRIP_COUNT="0" ;;
+		git)	local STRIP_COUNT="0" ;;
+		*)	local STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' | grep -Em1 '^(\+\+\+|---)[ ].*' | awk '{ print $2 }' | grep -co '^/'`" ;;
 	esac
 	patchfile_check "$patchfile" "${MAX_STRIP_COUNT}" "${STRIP_COUNT}"
 done
