@@ -587,9 +587,8 @@ if [ "${TEST_PORTLINT}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	check_command "${PORTLINT}" "Try installing it, pkg install portlint"
 	[ -z "${BUILD_LIST}" ] && buildlist
 	for port in ${BUILD_LIST}; do
-		cd "${PORTSDIR}/$port"
 		echo "$port"
-		${PORTLINT} ${PORTLINT_ARGS}
+		${PORTLINT} ${PORTLINT_ARGS} "${PORTSDIR}/$port"
 	done
 fi
 
