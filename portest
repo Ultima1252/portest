@@ -363,8 +363,12 @@ local STRIP_COUNT="$3"
 local FILE="`cat "$1" | grep -v '/dev/null' | grep -Em1 '^(\+\+\+|---)[ ].*' | awk '{ print $2 }'`"
 cd ${PORTSDIR}
 while [ "$2" -ge "${STRIP_COUNT}" ]; do
-	local check_file="`echo "${FILE}" | sed -E "s/^(\/)?([^\/]*\/){${STRIP_COUNT}}// ; s/\/.*//"`"
-	if [ -d "${PORTSDIR}/${check_file}" ]; then
+	if [ "${REPO_TYPE}" == "svn" ] && [ "`head -5 "$1" | grep -com1 '\-\-git'`" -eq "1" ]; then
+		local check_file="`echo "${FILE}" | sed -E "s/^([^\/]*\/){$(( ${STRIP_COUNT} + 1 ))}// ; s/\/.*//"`"
+	else
+		local check_file="`echo "${FILE}" | sed -E "s/^([^\/]*\/){${STRIP_COUNT}}// ; s/\/.*//"`"
+	fi
+	if [ -e "${PORTSDIR}/${check_file}" ]; then
 		case ${REPO_TYPE} in
 		svn*)	local OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" ${PORTSDIR}`"
 			local SUCCESS="`echo "${OUTPUT}" | grep -co '^.[ ][ ][ ]*'`"
@@ -415,10 +419,7 @@ filelist() {
 [ "${REPO_TYPE}" == "portsnap" ] && check_command "${PATCH}"
 for patchfile in ${UNI_PATCH_FILE}; do
 	local MAX_STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' |grep -Em1 '^(\+\+\+|---)[ ].*' | awk -F/ '{ print NF-1 }'`"
-	case ${REPO_TYPE} in
-		portsnap*)	local STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' | grep -Em1 '^(\+\+\+|---)[ ].*' | awk '{ print $2 }' | grep -co '^/'`" ;;
-		*)		local STRIP_COUNT="0" ;;
-	esac
+	local STRIP_COUNT="`cat "$patchfile" | grep -v '/dev/null' | grep -Em1 '^(\+\+\+|---)[ ].*' | awk '{ print $2 }' | grep -co '^/'`"
 	patchfile_check "$patchfile" "${MAX_STRIP_COUNT}" "${STRIP_COUNT}"
 done
 PATCH_FILES_LIST="`echo "${PATCH_FILES_LIST}
