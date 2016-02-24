@@ -370,7 +370,7 @@ while [ "$2" -ge "${STRIP_COUNT}" ]; do
 	fi
 	if [ -e "${PORTSDIR}/${check_file}" ]; then
 		case ${REPO_TYPE} in
-		svn*)	local OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" ${PORTSDIR}`"
+		svn*)	local OUTPUT="`${SVN} ${SVN_PATCH_ARGS} --dry-run --strip ${STRIP_COUNT} "$1" "${PORTSDIR}"`"
 			local SUCCESS="`echo "${OUTPUT}" | grep -co '^.[ ][ ][ ]*'`"
 			local FAILED="`echo "${OUTPUT}" | grep -co '^Skipped'`"
 			[ "${STRIP_COUNT}" -eq "0" ] && [ "${FAILED}" -eq "0" ] && add_patchfile "$1" "${STRIP_COUNT}" "${OUTPUT}" && return ;;
@@ -389,7 +389,7 @@ while [ "$2" -ge "${STRIP_COUNT}" ]; do
 		if [ "$2" -ge "${STRIP_COUNT}" ]; then
 			if [ "${HIGHEST_SUCCESS}" -gt "${HIGHEST_FAILED}" ]; then
 				add_patchfile "$1" "${HIGHEST_STRIP_COUNT}" "${HIGHEST_OUTPUT}" && return
-			else
+			elif [ "${HIGHEST_SUCCESS}" -ne "0" ] ; then
 				echo Patchfile "$1" Failed, try a revert? && exit 1
 			fi
 		fi
