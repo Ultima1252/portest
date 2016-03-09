@@ -334,8 +334,15 @@ done
 
 # Check for valid jails #
 if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
+
 	check_command "${POUDRIERE}" "Try installing it, pkg install poudriere"
-	[ -z "${POUDRIERE_JAILS}" ] && echo "no jails selected use -j or export POUDRIERE_JAILS=\"jail1 jail2\"" && exit 1
+	
+	# if no jails were set with -j use all jails for testing
+	if [ -z "${POUDRIERE_JAILS}" ]; then
+		echo "no jails selected; using all existing jails" 
+		POUDRIERE_JAILS=`poudriere  jail -l -n | grep -v "JAILNAME"`
+	fi
+	
 	POUDRIERE_JAILS=`printf "%s\n" ${POUDRIERE_JAILS} | sort -u`
 	for jail in ${POUDRIERE_JAILS}; do
 	${POUDRIERE} jail -i -j $jail >/dev/null 2>&1
