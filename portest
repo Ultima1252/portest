@@ -340,10 +340,11 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 	# if no jails were set with -j use all jails for testing
 	if [ -z "${POUDRIERE_JAILS}" ]; then
 		echo "no jails selected; using all existing jails" 
-		POUDRIERE_JAILS=`poudriere  jail -l -n | grep -v "JAILNAME"`
+		POUDRIERE_JAILS="`poudriere  jail -lnq`"
+	else
+		POUDRIERE_JAILS=`printf "%s\n" ${POUDRIERE_JAILS} | sort -u`
 	fi
 	
-	POUDRIERE_JAILS=`printf "%s\n" ${POUDRIERE_JAILS} | sort -u`
 	for jail in ${POUDRIERE_JAILS}; do
 	${POUDRIERE} jail -i -j $jail >/dev/null 2>&1
 	[ $? -ne 0 ] && echo "No such jail $jail" && exit 1
