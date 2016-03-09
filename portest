@@ -34,41 +34,38 @@ Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] [-abcCdprRtTuv]
                file.diff cat/port ...
 
 Parameters:
-    -a     --  Do everything except revert and port test (-ptf build.ports.txt)
-    -c     --  Create repo, see -m for supported protocols, default is git
-    -f     --  Generate a poudiere usable bulk file
-    -p     --  Patch, will exit on fail with output
-               portsnap will create a backup directory
-               which is used on soft reverts (-r) and updates (-u)
-    -r     --  Revert repo, quick and effective
+    -a     --  The equivalent to (-ptf build.ports.txt).
+    -c     --  Create repo, see -m for supported protocols, default is git.
+    -f     --  Generate poudiere usable bulk file.
+    -p     --  Patch, portsnap will create a backup directory which is used
+               on soft reverts (-r).
+    -r     --  "Soft" revert, a quick and effective way to revert.
                portsnap uses backup created when patch (-p) is used, fast
                git (-r) is same as (-R) see below
                svn reverts all files from input patchfiles, fast
-    -R     --  Reset repo, portsnap will rebuild tree, very slow
+    -R     --  "Hard" revert, will reset the repo.
+               portsnap will rebuild tree, very slow
                git does hard reset and cleans all files, fast
                svn removed all files via status and revert -R, very slow!!
-    -t     --  Test with portlint
-    -T     --  Test with port test, or poudriere depending on
-               USE_POUDRIERE
-    -u     --  Update repo, git and svn will do a hard revert (-R) first
-               portsnap do a soft revert if a backup directory exists
-    -v     --  Show version of portest then exit
+    -t     --  Test with portlint.
+    -T     --  Test with port test, or poudriere depending on USE_POUDRIERE.
+    -u     --  Update repo, if revert -r or -R is used, revert will occur
+               before update. This is Suggested with git and portsnap.
+    -v     --  Show version of portest then exit 0.
 Options:
     -b     --  Generate the list of cat/ports based on port tree
-               instead of diff, git and svn only, slow
+               instead of diff, git and svn only, slow.
     -C     --  Check only, will not touch port tree, only vaild with -p
                git may display errors if files do not exist,
-               these files are created without this option
-    -d     --  Sets PORTSDIR, -U overrides this option
-    -j     --  Jails used for poudriere, if multiple are used
-               must be in "" with a space as a seperator,
-               only used with -T option
+               these files are created without this option.
+    -d     --  Sets PORTSDIR, -U overrides this option.
+    -j     --  Jails to use for poudriere, if multiple are used must be
+               in "" with a space as a seperator. If no jails are selected
+               all jails will be used, only valid with -T option.
     -m     --  Repo method, only used with -c valid methods are
                git,git+https,git+ssh,svn,svn+http,svn+https,
-               svn+ssh,portsnap default method is git
-    -U     --  Sets USE_POUDRIERE="YES" and sets port tree to use
-
-By default, (no options) portest does nothing
+               svn+ssh,portsnap. Default method is git.
+    -U     --  Sets USE_POUDRIERE="YES" and sets port tree to use.
 EOF
 	exit 1
 }
