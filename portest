@@ -633,6 +633,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 		fi
 		sleep 1
 		printf "."
+		${TMUX_COMMAND} select-layout -t "${TMUX_SESSION}" ${TMUX_LAYOUT}
 	done
 	printf " Done"
 	printf "\nVerifying jails started successfully... Please wait"
@@ -657,11 +658,11 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 				JAILS_STARTED="0"
 			fi
 			printf "."
+			${TMUX_COMMAND} select-layout -t "${TMUX_SESSION}" ${TMUX_LAYOUT}
 		done
 		JAIL_VERIFY=$(( ${JAIL_VERIFY} + 1 ))
 	done
 	printf " done"
-	${TMUX_COMMAND} select-layout -t "${TMUX_SESSION}" ${TMUX_LAYOUT}
 	${TMUX_COMMAND} attach-session -t "${TMUX_SESSION}" >/dev/null 2>&1
 	if [ "$?" -ne 0 ]; then
 		${TMUX_COMMAND} switch -t "${TMUX_SESSION}"
