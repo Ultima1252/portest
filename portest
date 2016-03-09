@@ -35,7 +35,7 @@ Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] [-abcCdprRtTuv]
 
 Parameters:
     -a     --  The equivalent to (-ptf build.ports.txt).
-    -c     --  Create repo, see -m for supported protocols, default is git.
+    -c     --  Create repo, see -m for supported protocols, default is svn.
     -f     --  Generate poudiere usable bulk file.
     -p     --  Patch, portsnap will create a backup directory which is used
                on soft reverts (-r).
@@ -64,7 +64,7 @@ Options:
                all jails will be used, only valid with -T option.
     -m     --  Repo method, only used with -c valid methods are
                git,git+https,git+ssh,svn,svn+http,svn+https,
-               svn+ssh,portsnap. Default method is git.
+               svn+ssh,portsnap. Default method is svn.
     -U     --  Sets USE_POUDRIERE="YES" and sets port tree to use.
 EOF
 	exit 1
@@ -136,7 +136,7 @@ elif [ $(( DO_PATCH )) -ge 1 ] && [ $# -lt 1 ]; then
 	usage;
 fi
 
-: ${METHOD:="git"}
+: ${METHOD:="svn"}
 if [ "${CREATE_REPO}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	: ${GIT_URL:="github.com/freebsd/freebsd-ports"}
 	: ${SVN_URL:="svn.FreeBSD.org/ports"}
