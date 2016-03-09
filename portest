@@ -343,8 +343,6 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 		POUDRIERE_JAILS=`poudriere  jail -l -n | grep -v "JAILNAME"`
 	fi
 	
-	POUDRIERE_JAILS=`pr
-	intf "%s\n" ${POUDRIERE_JAILS} | sort -u`
 	for jail in ${POUDRIERE_JAILS}; do
 	${POUDRIERE} jail -i -j $jail >/dev/null 2>&1
 	[ $? -ne 0 ] && echo "No such jail $jail" && exit 1
