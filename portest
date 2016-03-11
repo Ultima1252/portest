@@ -544,7 +544,7 @@ cd ${PORTSDIR}
 fi
 
 ### Patch Tree ###
-if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
+if [ -n "${UNI_PATCH_FILE}" ] && [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	if [ "${REPO_TYPE}" == "svn" ] || [ "${CHECK_ONLY}" -eq "1" ] ; then
 		[ -z "${PATCH_FILES_LIST}" ] && filelist
 	else
@@ -576,7 +576,7 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 		esac
 	fi
 	cd ${PORTSDIR}
-	[ -n "${UNI_PATCH_FILE}" ] && patchfile_patch "${UNI_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
+	patchfile_patch "${UNI_PATCH_FILE}" "${PATCH_STRIP_COUNT}"
 	case ${REPO_TYPE} in
 	svn*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 reject`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
