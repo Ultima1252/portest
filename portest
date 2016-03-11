@@ -471,7 +471,7 @@ fi
 
 portsnap_revert() {
 if [ "${REVERT_REPO}" -ge "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
-	! [ -d "${BACKUPDIR}" ] check_exit "Nothing to revert, try the -R option?" "ignoring" && return
+	! [ -d "${BACKUPDIR}" ] && check_exit "Nothing to revert, try the -R option?" "ignoring" && return
 	cd ${BACKUPDIR}
 	for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
 		rm -rf "${PORTSDIR}/$dir"
