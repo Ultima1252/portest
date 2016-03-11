@@ -43,10 +43,12 @@ Parameters:
                portsnap uses backup created when patch (-p) is used, fast
                git (-r) is same as (-R) see below
                svn reverts all files from input patchfiles, fast
+               multiple [-Rr] will revert twice, before and after a patch
     -R     --  "Hard" revert, will reset the repo.
                portsnap will rebuild tree, very slow
                git does hard reset and cleans all files, fast
                svn removed all files via status and revert -R, very slow!!
+               multiple [-Rr] will revert twice, before and after a patch
     -t     --  Test with portlint.
     -T     --  Test with port test, or poudriere depending on USE_POUDRIERE.
     -u     --  Update repo, if revert -r or -R is used, revert will occur
@@ -104,9 +106,9 @@ while getopts ":abcCd:j:f:m:prRtTuU:v" FLAG; do
 	p)
 		DO_PATCH="1" ;;
 	r)
-		REVERT_REPO="1" ;;
+		REVERT_REPO="$(( ${REVERT_REPO} + 1 ))" ;;
 	R)	
-		REVERT_REPO="1"
+		REVERT_REPO="$(( ${REVERT_REPO} + 1 ))"
 		RESET_REPO="1" ;;
 	t)
 		TEST_PORTLINT="1" ;;
@@ -273,7 +275,7 @@ cd ${PORTSDIR} && PORTSDIR="`pwd`"
 # Check PORTSDIR for svn or git tree #
 if [ -d "${PORTSDIR}/.svn" ]; then
 	check_svn && REPO_TYPE="svn" REPO="${SVN}" REPO_STATUS="status"
-	[ $(( ${REVERT_REPO} + ${RESET_REPO} )) -eq 1 ] && [ $# -lt 1 ] && usage
+	[ "${REVERT_REPO}" -ge "1" ] && [ "${RESET_REPO}" -ne "1" ] && [ $# -lt 1 ] && usage
 fi
 [ -d "${PORTSDIR}/.git" ] && check_command "${GIT}" "Try installing it, pkg install git" && REPO_TYPE="git" REPO="${GIT}" REPO_STATUS="status -s"
 # If not, use portsnap #
@@ -449,15 +451,15 @@ fi
 }
 
 git_revert() {
-if [ "${REVERT_REPO}" -eq "1" ]; then
+if [ "${REVERT_REPO}" -ge "1" ]; then
 ${GIT} ${GIT_RESET_ARGS}
 ${GIT} ${GIT_CLEAN_ARGS}
-REVERT_REPO="0"
+REVERT_REPO="$(( ${REVERT_REPO} - 1 ))"
 fi
 }
 
 portsnap_revert() {
-if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
+if [ "${REVERT_REPO}" -ge "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
 	cd ${BACKUPDIR}
 	for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
@@ -475,24 +477,25 @@ if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 	done
 	cd ${PORTSDIR} && rm -rf "${BACKUPDIR}"
 	rm `find ./ -maxdepth 2 -name "*.[ro][er][ji]*" | grep -v distfiles` >/dev/null 2>&1
-	REVERT_REPO="0"
-elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}"  -eq "1" ]; then
+elif [ "${REVERT_REPO}" -ge "1" ] && [ "${RESET_REPO}"  -eq "1" ]; then
 	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_EXTRACT_ARGS}
 	cd ${PORTSDIR} && rm -rf "${BACKUPDIR}"
 	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-	REVERT_REPO="0"
+	REVERT_REPO="$(( ${REVERT_REPO} - 1 ))"
+	RESET_REPO="0"
 fi
 }
 
 svn_revert() {
-if [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -eq "1" ]; then
+if [ "${REVERT_REPO}" -ge "1" ] && [ "${RESET_REPO}" -eq "1" ]; then
 	for file in `${SVN} status | awk '{ print $(NF) }'`; do
 		rm -rf "${PORTSDIR}/$file"
 	done
 	${SVN} ${SVN_REVERT_ARGS} ${PORTSDIR}
 	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-	REVERT_REPO="0"
-elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
+	REVERT_REPO="$(( ${REVERT_REPO} - 1 ))"
+	RESET_REPO="0"
+elif [ "${REVERT_REPO}" -ge "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 # Wierd cases where svn won't see short filenames in list.    #
 # This seems to be an svn bug, this list helps in those cases #
@@ -507,20 +510,25 @@ elif [ "${REVERT_REPO}" -eq "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
 	[ -n "${PATCH_FILES_LIST}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_LIST}
 	[ -n "${PATCH_FILES_FILTERED}" ] && ${SVN} ${SVN_REVERT_ARGS} ${PATCH_FILES_FILTERED}
 	rm `find ./ -maxdepth 1 -name "*.[ro][er][ji]*"` >/dev/null 2>&1
-	REVERT_REPO="0"
+	REVERT_REPO="$(( ${REVERT_REPO} - 1 ))"
 fi
 }
+if [ "${REVERT_REPO}" -gt "1" ] || [ "${UPDATE_REPO}" -eq "1" ] && [ "${REVERT_REPO}" -ge "1" ]; then
+	case ${REPO_TYPE} in
+		svn) svn_revert ;;
+		git) git_revert ;;
+		portsnap) portsnap_revert ;;
+	esac
+	[ "${DO_PATCH}" -ne "1" ] && REVERT_REPO=0
+fi
 
 ### Update Repo ###
 if [ "${UPDATE_REPO}" -eq "1" ]; then
 cd ${PORTSDIR}
 	case ${REPO_TYPE} in
-		svn)		svn_revert
-				${SVN} ${SVN_UPDATE_ARGS} ;;
-                git)		git_revert
-				${GIT} ${GIT_UPDATE_ARGS} ;;
-		portsnap)	portsnap_revert
-				${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_UPDATE_ARGS} ;;
+		svn)		${SVN} ${SVN_UPDATE_ARGS} ;;
+		git)		${GIT} ${GIT_UPDATE_ARGS} ;;
+		portsnap)	${PORTSNAP} ${PORTSNAP_ARGS} ${PORTSNAP_FETCH_ARGS} ${PORTSNAP_UPDATE_ARGS} ;;
 	esac
 fi
 
@@ -664,7 +672,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	if [ "$?" -ne 0 ]; then
 		${TMUX_COMMAND} switch -t "${TMUX_SESSION}"
 	fi
-	if [ "${REVERT_REPO}" -eq "1" ]; then
+	if [ "${REVERT_REPO}" -ge "1" ]; then
 		while [ "`${TMUX_COMMAND} list-sessions -F \#S | grep -com1 "${TMUX_SESSION}"`" -eq "1" ]; do
 			sleep 10
 		done
