@@ -30,7 +30,7 @@ PORTEST_VERSION="0.1.5"
 
 usage() {
 	cat << EOF
-Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] [-abcCdprRtTuv] \\
+Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] [-abcCdFprRtTuv] \\
                file.diff cat/port ...
 
 Parameters:
@@ -61,6 +61,7 @@ Options:
                git may display errors if files do not exist,
                these files are created without this option.
     -d     --  Sets PORTSDIR, -U overrides this option.
+    -F     --  Force portest to continue on checks that aren't critical.
     -j     --  Jails to use for poudriere, if multiple are used must be
                in "" with a space as a seperator. If no jails are selected
                all jails will be used, only valid with -T option.
@@ -82,9 +83,10 @@ TEST_BUILD="0"
 REPO_BUILD_LIST="0"
 CREATE_REPO="0"
 UPDATE_REPO="0"
-CHECK_ONLY=0
+CHECK_ONLY="0"
+SKIP_FAILED="0"
 
-while getopts ":abcCd:j:f:m:prRtTuU:v" FLAG; do
+while getopts ":abcCd:j:f:Fm:prRtTuU:v" FLAG; do
 	case "${FLAG}" in
 	a)
 		ALL="1" ;;
@@ -101,6 +103,8 @@ while getopts ":abcCd:j:f:m:prRtTuU:v" FLAG; do
 	f)
 		POUDRIERE_BULK="1"
 		BULK_FILE="${OPTARG}" ;;
+	F)
+		SKIP_FAILED="1" ;;
 	m)	
 		METHOD="${OPTARG}" ;;
 	p)
@@ -212,6 +216,13 @@ PORTSDIR="${POUDRIERE_PORTSDIR}/${POUDRIERE_PORT}"
 fi
 CURDIR="`pwd`"
 # Check commands #
+check_exit() {
+if [ ${SKIP_FAILED} -eq "0" ]; then
+	echo "$1" && exit 1
+else
+	echo "$1 $2 (-F)"
+fi
+}
 check_command() {
 if ! [ -x "`command -v $1`" ]; then
 	echo "$1 not found. $2" && exit 1
@@ -318,7 +329,7 @@ ${CURDIR}/$arg"
 		CAT_PORT="${CAT_PORT}
 $arg/"
 	else
-		echo "$arg not found" && exit 1
+		check_exit "$arg not found" "ignoring"
 	fi
 done
 
@@ -327,7 +338,7 @@ for file in ${PATCH_FILE}; do
 		UNI_PATCH_FILE="${UNI_PATCH_FILE}
 $file"
 	else
-		echo "$file is not a recognized patch format" && exit 1
+		check_exit "$file is not a recognized patch format" "ignoring"
 	fi
 done
 
@@ -396,7 +407,7 @@ while [ "$2" -ge "${STRIP_COUNT}" ]; do
 			if [ "${HIGHEST_SUCCESS}" -gt "${HIGHEST_FAILED}" ]; then
 				add_patchfile "$1" "${HIGHEST_STRIP_COUNT}" "${HIGHEST_OUTPUT}" && return
 			elif [ "${HIGHEST_SUCCESS}" -ne "0" ] ; then
-				echo Patchfile "$1" Failed, try a revert? && exit 1
+				check_exit "Patchfile "$1" Failed, try a revert?" "ignoring"
 			fi
 		fi
 	fi
@@ -460,7 +471,7 @@ fi
 
 portsnap_revert() {
 if [ "${REVERT_REPO}" -ge "1" ] && [ "${RESET_REPO}" -ne "1" ]; then
-	! [ -d "${BACKUPDIR}" ] && echo "Nothing to revert, try the -R option?" && exit 1
+	! [ -d "${BACKUPDIR}" ] check_exit "Nothing to revert, try the -R option?" "ignoring" && return
 	cd ${BACKUPDIR}
 	for dir in `find ./ -type d -maxdepth 1 | sed 's/^\.\///' | grep '^[A-Z]'`; do
 		rm -rf "${PORTSDIR}/$dir"
@@ -569,19 +580,19 @@ if [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	case ${REPO_TYPE} in
 	svn*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 reject`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
-			echo "Patch Failed" && exit 1
+			check_exit "Patch Failed" "continuing"
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*';;
 	git*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 error`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
-			echo "Patch Failed" && exit 1
+			check_exit "Patch Failed" "continuing"
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
 		[ "${CHECK_ONLY}" -ne "1" ] && rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` 2>/dev/null ;;
 	*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 rejects`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
-			echo "Patch Failed" && exit 1
+			check_exit "Patch Failed" "continuing"
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		[ "${CHECK_ONLY}" -ne "1" ] && cd ${PORTSDIR} && rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -name "*.orig"` 2>/dev/null ;;
