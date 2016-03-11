@@ -664,7 +664,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	if [ "$?" -ne 0 ]; then
 		${TMUX_COMMAND} switch -t "${TMUX_SESSION}"
 	fi
-	if [ "${REVERT_REPO}" -eq "1" ] || [ "${RESET_REPO}" -eq "1" ]; then
+	if [ "${REVERT_REPO}" -eq "1" ]; then
 		while [ "`${TMUX_COMMAND} list-sessions -F \#S | grep -com1 "${TMUX_SESSION}"`" -eq "1" ]; do
 			sleep 10
 		done
