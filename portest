@@ -190,6 +190,7 @@ fi
 : ${GIT_UPDATE_ARGS:="pull"}
 : ${MAKE:="make"}
 : ${MAKE_ARGS:="depends BATCH=yes"}
+: ${NICE:="+15"}
 : ${OPENSSL:="openssl"}
 : ${OPENSSL_ARGS:="rand -hex 16"}
 : ${TMUX_COMMAND:="tmux"}
@@ -642,9 +643,9 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	printf "\nStarting jails"
 	for jail in ${POUDRIERE_JAILS}; do
 		if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -ne "1" ]; then
-			${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+			${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
 		else
-			${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+			${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
 		fi
 		sleep 1
 		printf "."
@@ -662,9 +663,9 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 			OUTPUT="`${POUDRIERE} status -cH -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`"
 			if [ "${OUTPUT}" -ne "1" ]; then
 				if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -eq "1" ]; then
-					${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+					${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
 				else
-					${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+					${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
 				fi
 			fi
 			if [ "${JAILS_STARTED}" -ne "0" ] && [ "${OUTPUT}" -eq "1" ] ; then
