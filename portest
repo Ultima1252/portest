@@ -402,15 +402,15 @@ while [ "$2" -ge "${STRIP_COUNT}" ]; do
 				local FAILED="`echo "${OUTPUT}" | grep -Eco '[0-9]+ ignored'`" ;;
 		esac
 		[ "$(( ${HIGHEST_SUCCESS} - ${HIGHEST_FAILED} ))" -lt "$(( ${SUCCESS} - ${FAILED} ))" ] && local HIGHEST_SUCCESS="${SUCCESS}" local HIGHEST_FAILED="${FAILED}" local HIGHEST_STRIP_COUNT="${STRIP_COUNT}" local HIGHEST_OUTPUT="${OUTPUT}"
-		if [ "$2" -ge "${STRIP_COUNT}" ]; then
-			if [ "${HIGHEST_SUCCESS}" -gt "${HIGHEST_FAILED}" ]; then
-				add_patchfile "$1" "${HIGHEST_STRIP_COUNT}" "${HIGHEST_OUTPUT}" && return
-			elif [ "${HIGHEST_SUCCESS}" -ne "0" ] ; then
-				check_exit "Patchfile "$1" Failed, try a revert?" "ignoring"
-			fi
-		fi
 	fi
 	local STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
+	if [ "$2" -ge "${STRIP_COUNT}" ]; then
+		if [ "${HIGHEST_SUCCESS}" -gt "${HIGHEST_FAILED}" ] && [ "${HIGHEST_SUCCESS}" -ne "0" ]; then
+			add_patchfile "$1" "${HIGHEST_STRIP_COUNT}" "${HIGHEST_OUTPUT}" && return
+		else
+			check_exit "Patchfile "$1" Failed, try a revert?" "ignoring"
+		fi
+	fi
 done
 }
 
