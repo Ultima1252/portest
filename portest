@@ -642,7 +642,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	printf " Done"
 	printf "\nStarting jails"
 	for jail in ${POUDRIERE_JAILS}; do
-		if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -ne "1" ]; then
+		if [ "`${TMUX_COMMAND} list-sessions 2>/dev/null | grep -com1 "${TMUX_SESSION}"`" -ne "1" ]; then
 			${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
 		else
 			${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
