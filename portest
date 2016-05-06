@@ -170,38 +170,38 @@ if [ "${CREATE_REPO}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	esac
 fi
 
-: ${PATCH:="patch"}
-: ${PATCH_ARGS:="-Ef"}
-: ${PORTSNAP:="portsnap"}
-: ${PORTSNAP_FETCH_ARGS:="fetch"}
-: ${PORTSNAP_EXTRACT_ARGS:="extract"}
-: ${PORTSNAP_UPDATE_ARGS:="update"}
-: ${SVN:="svn"}
-: ${SVN_CHECKOUT_ARGS:="checkout ${SVN_REPO_URL}"}
-: ${SVN_PATCH_ARGS:="patch"}
-: ${SVN_REVERT_ARGS:="revert -R"}
-: ${SVN_UPDATE_ARGS:="update"}
-: ${GIT:="git"}
-: ${GIT_ADD_ARGS:="add -AN"}
-: ${GIT_CLEAN_ARGS:="clean -fd -f -x -e /distfiles -e /local -e /packages -e /INDEX-[0-9]* -e *~ -e *.sw[p-z]"}
-: ${GIT_CLONE_ARGS:="clone --depth 1 -b ${BRANCH} ${GIT_REPO_URL}"}
-: ${GIT_APPLY_ARGS:="apply --whitespace=nowarn"}
-: ${GIT_RESET_ARGS:="reset --hard"}
-: ${GIT_UPDATE_ARGS:="pull"}
-: ${MAKE:="make"}
+PATCH="patch"
+PATCH_ARGS="-Ef"
+PORTSNAP="portsnap"
+PORTSNAP_FETCH_ARGS="fetch"
+PORTSNAP_EXTRACT_ARGS="extract"
+PORTSNAP_UPDATE_ARGS="update"
+SVN="svn"
+SVN_CHECKOUT_ARGS="checkout ${SVN_REPO_URL}"
+SVN_PATCH_ARGS="patch"
+SVN_REVERT_ARGS="revert -R"
+SVN_UPDATE_ARGS="update"
+GIT="git"
+GIT_ADD_ARGS="add -AN"
+GIT_CLEAN_ARGS="clean -fd -f -x -e /distfiles -e /local -e /packages -e /INDEX-[0-9]* -e *~ -e *.sw[p-z]"
+GIT_CLONE_ARGS="clone --depth 1 -b ${BRANCH} ${GIT_REPO_URL}"
+GIT_APPLY_ARGS="apply --whitespace=nowarn"
+GIT_RESET_ARGS="reset --hard"
+GIT_UPDATE_ARGS="pull"
+MAKE="make"
+OPENSSL="openssl"
+OPENSSL_ARGS="rand -hex 16"
+TMUX_COMMAND="tmux"
+PORTLINT="portlint"
+PORT="port"
+PORT_ARGS="test"
+
+: ${BULK_FILE:="build.ports.txt"}
 : ${MAKE_ARGS:="depends BATCH=yes"}
 : ${NICE:="+15"}
-: ${OPENSSL:="openssl"}
-: ${OPENSSL_ARGS:="rand -hex 16"}
-: ${TMUX_COMMAND:="tmux"}
-: ${TMUX_LAYOUT:="tiled"}
-: ${PORTLINT:="portlint"}
-: ${PORTLINT_ARGS:="-AC"}
-: ${PORT:="port"}
-: ${PORT_ARGS:="test"}
 : ${PORTSDIR:="/usr/ports"}
-: ${BULK_FILE:="build.ports.txt"}
-
+: ${PORTLINT_ARGS:="-AC"}
+: ${TMUX_LAYOUT:="tiled"}
 
 : ${USE_POUDRIERE:="NO"}
 : ${POUDRIERE_JAILS:=""}
