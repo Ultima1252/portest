@@ -405,7 +405,7 @@ while [ "$2" -ge "${STRIP_COUNT}" ]; do
 		[ "$(( ${HIGHEST_SUCCESS} - ${HIGHEST_FAILED} ))" -lt "$(( ${SUCCESS} - ${FAILED} ))" ] && local HIGHEST_SUCCESS="${SUCCESS}" local HIGHEST_FAILED="${FAILED}" local HIGHEST_STRIP_COUNT="${STRIP_COUNT}" local HIGHEST_OUTPUT="${OUTPUT}"
 	fi
 	local STRIP_COUNT=$(( ${STRIP_COUNT} + 1 ))
-	if [ "$2" -ge "${STRIP_COUNT}" ]; then
+	if [ "$2" -le "${STRIP_COUNT}" ]; then
 		if [ "${HIGHEST_SUCCESS}" -gt "${HIGHEST_FAILED}" ] && [ "${HIGHEST_SUCCESS}" -ne "0" ]; then
 			add_patchfile "$1" "${HIGHEST_STRIP_COUNT}" "${HIGHEST_OUTPUT}" && return
 		else
