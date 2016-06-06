@@ -34,7 +34,7 @@ Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] [-abcCdFprRtTuv
                file.diff cat/port ...
 
 Parameters:
-    -a     --  The equivalent to (-ptf build.ports.txt).
+    -a     --  The equivalent to (-ptf /tmp/build.ports.txt).
     -c     --  Create repo, see -m for supported protocols, default is svn.
     -f     --  Generate poudiere usable bulk file.
     -p     --  Patch, portsnap will create a backup directory which is used
@@ -196,7 +196,7 @@ PORTLINT="portlint"
 PORT="port"
 PORT_ARGS="test"
 
-: ${BULK_FILE:="build.ports.txt"}
+: ${BULK_FILE:="/tmp/build.ports.txt"}
 : ${MAKE_ARGS:="depends BATCH=yes"}
 : ${NICE:="+15"}
 : ${PORTSDIR:="/usr/ports"}
@@ -600,7 +600,7 @@ if [ -n "${UNI_PATCH_FILE}" ] && [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1"
 fi
 
 ### Bulk File ###
-if [ "${POUDRIERE_BULK}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
+if [ "${POUDRIERE_BULK}" -eq "1" ] || [ "${TEST_BUILD}" -eq "1" ] || [ "${ALL}" -eq "1" ]; then
 	[ -z "${BUILD_LIST}" ] && buildlist
 	cd "${CURDIR}" && echo "${BUILD_LIST}" >"${BULK_FILE}"
 fi
@@ -641,11 +641,12 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	done
 	printf " Done"
 	printf "\nStarting jails"
+	cd "${CURDIR}"
 	for jail in ${POUDRIERE_JAILS}; do
 		if [ "`${TMUX_COMMAND} list-sessions 2>/dev/null | grep -com1 "${TMUX_SESSION}"`" -ne "1" ]; then
-			${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+			${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail -f ${BULK_FILE}
 		else
-			${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+			${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail -f ${BULK_FILE}
 		fi
 		sleep 1
 		printf "."
@@ -663,9 +664,9 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 			OUTPUT="`${POUDRIERE} status -cH -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`"
 			if [ "${OUTPUT}" -ne "1" ]; then
 				if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -eq "1" ]; then
-					${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+					${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail -f ${BULK_FILE}
 				else
-					${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail ${BUILD_LIST}
+					${TMUX_COMMAND} new-session -ds "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail -f ${BULK_FILE}
 				fi
 			fi
 			if [ "${JAILS_STARTED}" -ne "0" ] && [ "${OUTPUT}" -eq "1" ] ; then
