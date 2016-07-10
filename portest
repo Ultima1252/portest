@@ -178,18 +178,13 @@ GIT_CLONE_ARGS="clone --depth 1 -b ${BRANCH} ${GIT_REPO_URL}"
 GIT_APPLY_ARGS="apply --whitespace=nowarn"
 GIT_RESET_ARGS="reset --hard"
 GIT_UPDATE_ARGS="pull"
-MAKE="make"
 OPENSSL="openssl"
 OPENSSL_ARGS="rand -hex 16"
-TMUX_COMMAND="tmux"
 PORTLINT="portlint"
 
 : ${BULK_FILE:="/tmp/build.ports.txt"}
-: ${MAKE_ARGS:="depends BATCH=yes"}
-: ${NICE:="+15"}
 : ${PORTSDIR:="/usr/ports"}
 : ${PORTLINT_ARGS:="-AC"}
-: ${TMUX_LAYOUT:="tiled"}
 
 if [ "${USE_POUDRIERE}" == "YES" ]; then
 	POUDRIERE="poudriere"
@@ -201,9 +196,14 @@ if [ "${USE_POUDRIERE}" == "YES" ]; then
 	: ${POUDRIERE_BULK_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
 	: ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"}
 	PORTSDIR="${POUDRIERE_PORTSDIR}/${POUDRIERE_PORT}"
+	TMUX_COMMAND="tmux"
+	: ${NICE:="+15"}
+	: ${TMUX_LAYOUT:="tiled"}
 elif [ "${TEST_BUILD}" -eq 1 ]; then
 	PORT="port"
 	PORT_ARGS="test"
+	MAKE="make"
+	: ${MAKE_ARGS:="depends BATCH=yes"}
 fi
 CURDIR="`pwd`"
 # Check commands #
