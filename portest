@@ -88,47 +88,27 @@ SKIP_FAILED="0"
 
 while getopts ":abcCd:j:f:Fm:prRtTuU:v" FLAG; do
 	case "${FLAG}" in
-	a)
-		ALL="1" ;;
-	b)
-		REPO_BUILD_LIST="1" ;;
-	c)
-		CREATE_REPO="1" ;;
-	C)
-		CHECK_ONLY="1" ;;
-	d)
-		PORTSDIR="${OPTARG}" ;;
-	j)
-		POUDRIERE_JAILS="${OPTARG}" ;;
-	f)
-		POUDRIERE_BULK="1"
+	a)	ALL="1" ;;
+	b)	REPO_BUILD_LIST="1" ;;
+	c)	CREATE_REPO="1" ;;
+	C)	CHECK_ONLY="1" ;;
+	d)	PORTSDIR="${OPTARG}" ;;
+	j)	POUDRIERE_JAILS="${OPTARG}" ;;
+	f)	POUDRIERE_BULK="1"
 		BULK_FILE="${OPTARG}" ;;
-	F)
-		SKIP_FAILED="1" ;;
-	m)	
-		METHOD="${OPTARG}" ;;
-	p)
-		DO_PATCH="1" ;;
-	r)
-		REVERT_REPO="$(( ${REVERT_REPO} + 1 ))" ;;
-	R)	
-		REVERT_REPO="$(( ${REVERT_REPO} + 1 ))"
+	F)	SKIP_FAILED="1" ;;
+	m)	METHOD="${OPTARG}" ;;
+	p)	DO_PATCH="1" ;;
+	r)	REVERT_REPO="$(( ${REVERT_REPO} + 1 ))" ;;
+	R)	REVERT_REPO="$(( ${REVERT_REPO} + 1 ))"
 		RESET_REPO="1" ;;
-	t)
-		TEST_PORTLINT="1" ;;
-	T)
-		TEST_BUILD="1" ;;
-	u)
-		UPDATE_REPO="1" ;;
-	U)
-		USE_POUDRIERE="YES"
+	t)	TEST_PORTLINT="1" ;;
+	T)	TEST_BUILD="1" ;;
+	u)	UPDATE_REPO="1" ;;
+	U)	USE_POUDRIERE="YES"
 		POUDRIERE_PORT="${OPTARG}" ;;
-	v)
-		echo "${PORTEST_VERSION}"
-		exit 0 ;;
-	*)
-		usage
-		exit 1 ;;
+	v)	echo "${PORTEST_VERSION}" && exit 0 ;;
+	*)	usage && exit 1 ;;
 	esac
 done
 
@@ -170,6 +150,16 @@ if [ "${CREATE_REPO}" -eq "1" ] && [ "${USE_POUDRIERE}" != "YES" ]; then
 	esac
 fi
 
+: ${USE_POUDRIERE:="NO"}
+if [ "${USE_POUDRIERE}" == "YES" ]; then
+	: ${POUDRIERE_ETC:="/usr/local/etc"}
+	if [ -f "${POUDRIERE_ETC}/poudriere.conf" ]; then
+	. ${POUDRIERE_ETC}/poudriere.conf
+	elif [ -f "${POUDRIERE_ETC}/poudriere.d/poudriere.conf" ]; then
+	. ${POUDRIERE_ETC}/poudriere.d/poudriere.conf
+	fi
+fi
+
 PATCH="patch"
 PATCH_ARGS="-Ef"
 PORTSNAP="portsnap"
@@ -193,8 +183,6 @@ OPENSSL="openssl"
 OPENSSL_ARGS="rand -hex 16"
 TMUX_COMMAND="tmux"
 PORTLINT="portlint"
-PORT="port"
-PORT_ARGS="test"
 
 : ${BULK_FILE:="/tmp/build.ports.txt"}
 : ${MAKE_ARGS:="depends BATCH=yes"}
@@ -203,17 +191,19 @@ PORT_ARGS="test"
 : ${PORTLINT_ARGS:="-AC"}
 : ${TMUX_LAYOUT:="tiled"}
 
-: ${USE_POUDRIERE:="NO"}
-: ${POUDRIERE_JAILS:=""}
-: ${POUDRIERE_PORTSDIR:="/usr/local/poudriere/ports"}
-: ${POUDRIERE_PORT:="default"}
-: ${POUDRIERE:="/usr/local/bin/poudriere"}
-: ${POUDRIERE_BULK_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
-: ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"}
-
-# Set poudriere ports dir if being used #
 if [ "${USE_POUDRIERE}" == "YES" ]; then
-PORTSDIR="${POUDRIERE_PORTSDIR}/${POUDRIERE_PORT}"
+	POUDRIERE="poudriere"
+	: ${POUDRIERE_JAILS:=""}
+	: ${BASEFS:="/usr/local/poudriere"}
+	: ${POUDRIERE_PORTSDIR:="${BASEFS}/ports"}
+	: ${POUDRIERE_DATA=:"${BASEFS}/data"}
+	: ${POUDRIERE_PORT:="default"}
+	: ${POUDRIERE_BULK_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
+	: ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"}
+	PORTSDIR="${POUDRIERE_PORTSDIR}/${POUDRIERE_PORT}"
+elif [ "${TEST_BUILD}" -eq 1 ]; then
+	PORT="port"
+	PORT_ARGS="test"
 fi
 CURDIR="`pwd`"
 # Check commands #
