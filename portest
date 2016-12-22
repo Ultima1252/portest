@@ -557,12 +557,6 @@ if [ -n "${UNI_PATCH_FILE}" ] && [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1"
 				for dir in `echo "${PATCH_FILES_LIST}" | grep -o '^[^/]*\/[^/]*\/' | sed 's/\/$//' | sort -u`; do
 					! [ -d "${BACKUPDIR}/$dir" ] && cp -Ra "${PORTSDIR}/$dir" "${BACKUPDIR}/$dir"
 				done ;;
-		git*)		for dir in `echo "${PATCH_FOLDER_LIST}"`; do
-					! [ -d "${PORTSDIR}/$dir" ] && mkdir -p "${PORTSDIR}/$dir"
-				done
-				for file in `echo "${PATCH_FILES_LIST}"`; do
-					! [ -f "${PORTSDIR}/$file" ] && touch "${PORTSDIR}/$file"
-				done ;;
 		esac
 	fi
 	cd ${PORTSDIR}
@@ -579,7 +573,7 @@ if [ -n "${UNI_PATCH_FILE}" ] && [ "${DO_PATCH}" -eq "1" ] || [ "${ALL}" -eq "1"
 		fi
 		echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 		${GIT} ${GIT_ADD_ARGS} ${PATCH_FOLDER_LIST}
-		[ "${CHECK_ONLY}" -ne "1" ] && rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty` 2>/dev/null ;;
+		[ "${CHECK_ONLY}" -ne "1" ] && rm `find ${PATCH_FOLDER_LIST} -maxdepth 1 -empty 2>/dev/null` 2>/dev/null ;;
 	*)	if [ "`echo "${PATCH_OUTPUT}" | grep -com1 rejects`" -gt "0" ]; then
 			echo "${PATCH_OUTPUT}" | grep '^[^ ].*'
 			check_exit "Patch Failed" "continuing"
