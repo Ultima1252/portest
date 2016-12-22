@@ -337,10 +337,10 @@ done
 if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 
 	check_command "${POUDRIERE}" "Try installing it, pkg install poudriere"
-	
+
 	# if no jails were set with -j use all jails for testing
 	if [ -z "${POUDRIERE_JAILS}" ]; then
-		echo "no jails selected; using all existing jails" 
+		echo "no jails selected; using all existing jails"
 		POUDRIERE_JAILS="`poudriere  jail -lnq`"
 	else
 		POUDRIERE_JAILS=`printf "%s\n" ${POUDRIERE_JAILS} | sort -u`
@@ -355,7 +355,7 @@ add_patchfile() {
 	case ${REPO_TYPE} in
 	svn*)	PATCH_FILES_LIST="${PATCH_FILES_LIST}
 "`echo "$3" | grep '^[^\>][ ][ ][ ].*' |  awk '{ print $(NF) }'` ;;
-	git*)	PATCH_FILES_LIST="${PATCH_FILES_LIST} 
+	git*)	PATCH_FILES_LIST="${PATCH_FILES_LIST}
 "`echo "$3" | grep '\.\.\.$' | awk '{ print $(NF) }'| sed 's/\.\.\.$//'` ;;
 	portsnap*)	PATCH_FILES_LIST="${PATCH_FILES_LIST}
 "`echo "$3" | grep -A 2 '\-\-\-\-' | grep '\.\.\.$' | awk '{ print $3 }' | grep -v '^to$'` ;;
