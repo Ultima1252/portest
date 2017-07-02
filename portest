@@ -30,8 +30,8 @@ PORTEST_VERSION="0.1.8"
 
 usage() {
 	cat << EOF
-Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] [-abcCdFprRtTuv] \\
-               file.diff cat/port ...
+Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] [-z set1] \\
+		[-abcCdFprRtTuv] file.diff cat/port ...
 
 Parameters:
     -a     --  The equivalent to (-ptf /tmp/build.ports.txt).
@@ -69,6 +69,7 @@ Options:
                git,git+https,git+ssh,svn,svn+http,svn+https,
                svn+ssh,portsnap. Default method is svn.
     -U     --  Sets USE_POUDRIERE="YES" and sets port tree to use.
+    -z     --  This specifies which SET to use for poudriere.
 EOF
 	exit 1
 }
@@ -84,9 +85,10 @@ REPO_BUILD_LIST="0"
 CREATE_REPO="0"
 UPDATE_REPO="0"
 CHECK_ONLY="0"
+POUDRIERE_SET=""
 SKIP_FAILED="0"
 
-while getopts ":abcCd:j:f:Fm:prRtTuU:v" FLAG; do
+while getopts ":abcCd:j:f:Fm:prRtTuU:vz:" FLAG; do
 	case "${FLAG}" in
 	a)	ALL="1" ;;
 	b)	REPO_BUILD_LIST="1" ;;
@@ -108,6 +110,7 @@ while getopts ":abcCd:j:f:Fm:prRtTuU:v" FLAG; do
 	U)	USE_POUDRIERE="YES"
 		POUDRIERE_PORT="${OPTARG}" ;;
 	v)	echo "${PORTEST_VERSION}" && exit 0 ;;
+	z)	POUDRIERE_SET="-z ${OPTARG}" ;;
 	*)	usage && exit 1 ;;
 	esac
 done
@@ -193,8 +196,10 @@ if [ "${USE_POUDRIERE}" == "YES" ]; then
 	: ${POUDRIERE_PORTSDIR:="${BASEFS}/ports"}
 	: ${POUDRIERE_DATA=:"${BASEFS}/data"}
 	: ${POUDRIERE_PORT:="default"}
-	: ${POUDRIERE_BULK_ARGS:="bulk -t -C -p ${POUDRIERE_PORT}"}
-	: ${POUDRIERE_PORTS_ARGS:="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"}
+	POUDRIERE_BULK_ARGS="bulk ${POUDRIERE_SET} -t -C -p ${POUDRIERE_PORT}"
+	POUDRIERE_JAIL_ARGS="jail ${POUDRIERE_SET} -i"
+	POUDRIERE_PORTS_ARGS="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"
+	POUDRIERE_STATUS_ARGS="status ${POUDRIERE_SET:="-z 0"} -cH"
 	PORTSDIR="${POUDRIERE_PORTSDIR}/${POUDRIERE_PORT}"
 	TMUX_COMMAND="tmux"
 	: ${NICE:="+15"}
@@ -345,7 +350,7 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 	else
 		POUDRIERE_JAILS=`printf "%s\n" ${POUDRIERE_JAILS} | sort -u`
 		for jail in ${POUDRIERE_JAILS}; do
-			${POUDRIERE} jail -i -j $jail >/dev/null 2>&1
+			${POUDRIERE} ${POUDRIERE_JAIL_ARGS} -j $jail >/dev/null 2>&1
 			[ $? -ne 0 ] && echo "No such jail $jail" && exit 1
 		done
 	fi
@@ -618,7 +623,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	: ${TMUX_SESSION:="portest-`${OPENSSL} ${OPENSSL_ARGS}`"}
 	printf "Verifying jails not already running"
 	for jail in ${POUDRIERE_JAILS}; do
-		if [ "`${POUDRIERE} status -cH -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`" -eq "1" ]; then
+		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`" -eq "1" ]; then
 			echo " $jail is already running on ${POUDRIERE_PORT}" && exit 1
 		fi
 		printf "."
@@ -645,7 +650,7 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 		sleep 10
 		JAILS_STARTED="1"
 		for jail in ${POUDRIERE_JAILS}; do
-			OUTPUT="`${POUDRIERE} status -cH -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`"
+			OUTPUT="`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`"
 			if [ "${OUTPUT}" -ne "1" ]; then
 				if [ "`${TMUX_COMMAND} list-sessions | grep -com1 "${TMUX_SESSION}"`" -eq "1" ]; then
 					${TMUX_COMMAND} split-window -dt "${TMUX_SESSION}" nice -n ${NICE} ${POUDRIERE} ${POUDRIERE_BULK_ARGS} -j $jail -f ${BULK_FILE}
