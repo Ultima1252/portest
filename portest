@@ -182,7 +182,7 @@ GIT_APPLY_ARGS="apply --whitespace=nowarn"
 GIT_RESET_ARGS="reset --hard"
 GIT_UPDATE_ARGS="pull"
 OPENSSL="openssl"
-OPENSSL_ARGS="rand -hex 16"
+OPENSSL_ARGS="rand -hex 4"
 PORTLINT="portlint"
 
 : ${BULK_FILE:="/tmp/build.ports.txt"}
