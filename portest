@@ -30,8 +30,9 @@ PORTEST_VERSION="0.1.8"
 
 usage() {
 	cat << EOF
-Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] [-z set1] \\
-		[-abcCdFprRtTuv] file.diff cat/port ...
+Usage: portest [-m git] [-f bulkfile] [-U default] [-d PORTSDIR] \\
+		[-z "set1 set2"] [-j "jail1 jail2"] [-abcCdFprRtTuv] \\
+		file.diff cat/port ...
 
 Parameters:
     -a     --  The equivalent to (-ptf /tmp/build.ports.txt).
@@ -70,6 +71,7 @@ Options:
                svn+ssh,portsnap. Default method is svn.
     -U     --  Sets USE_POUDRIERE="YES" and sets port tree to use.
     -z     --  This specifies which SET to use for poudriere.
+               Multiple sets can be used, 0 is the default set.
 EOF
 	exit 1
 }
@@ -85,7 +87,7 @@ REPO_BUILD_LIST="0"
 CREATE_REPO="0"
 UPDATE_REPO="0"
 CHECK_ONLY="0"
-POUDRIERE_SET=""
+POUDRIERE_SETS="0"
 SKIP_FAILED="0"
 
 while getopts ":abcCd:j:f:Fm:prRtTuU:vz:" FLAG; do
@@ -110,7 +112,7 @@ while getopts ":abcCd:j:f:Fm:prRtTuU:vz:" FLAG; do
 	U)	USE_POUDRIERE="YES"
 		POUDRIERE_PORT="${OPTARG}" ;;
 	v)	echo "${PORTEST_VERSION}" && exit 0 ;;
-	z)	POUDRIERE_SET="-z ${OPTARG}" ;;
+	z)	POUDRIERE_SETS="${OPTARG}" ;;
 	*)	usage && exit 1 ;;
 	esac
 done
@@ -196,10 +198,17 @@ if [ "${USE_POUDRIERE}" == "YES" ]; then
 	: ${POUDRIERE_PORTSDIR:="${BASEFS}/ports"}
 	: ${POUDRIERE_DATA=:"${BASEFS}/data"}
 	: ${POUDRIERE_PORT:="default"}
-	POUDRIERE_BULK_ARGS="bulk ${POUDRIERE_SET} -t -C -p ${POUDRIERE_PORT}"
-	POUDRIERE_JAIL_ARGS="jail ${POUDRIERE_SET} -i"
+	POUDRIERE_JAIL_ARGS="jail -i"
 	POUDRIERE_PORTS_ARGS="ports -c -m ${METHOD} -p ${POUDRIERE_PORT}"
+	poudriere_args() {
+		if [ "$1" == "0" ]; then
+			local POUDRIERE_SET=""
+		else
+			local POUDRIERE_SET="-z $1"
+		fi
+	POUDRIERE_BULK_ARGS="bulk ${POUDRIERE_SET} -t -C -p ${POUDRIERE_PORT}"
 	POUDRIERE_STATUS_ARGS="status ${POUDRIERE_SET:="-z 0"} -cH"
+	}
 	PORTSDIR="${POUDRIERE_PORTSDIR}/${POUDRIERE_PORT}"
 	TMUX_COMMAND="tmux"
 	: ${NICE:="+15"}
@@ -346,7 +355,7 @@ if [ "${USE_POUDRIERE}" == "YES" ] && [ "${TEST_BUILD}" -eq "1" ]; then
 	# if no jails were set with -j use all jails for testing
 	if [ -z "${POUDRIERE_JAILS}" ]; then
 		echo "no jails selected; using all existing jails"
-		POUDRIERE_JAILS="`poudriere  jail -lnq`"
+		POUDRIERE_JAILS="`poudriere jail -lnq`"
 	else
 		POUDRIERE_JAILS=`printf "%s\n" ${POUDRIERE_JAILS} | sort -u`
 		for jail in ${POUDRIERE_JAILS}; do
@@ -621,6 +630,8 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 	[ -z ${TMUX_SESSION} ] && check_command "${OPENSSL}" "Try installing it, pkg install openssl"
 	[ -z "${BUILD_LIST}" ] && buildlist
 	: ${TMUX_SESSION:="portest-`${OPENSSL} ${OPENSSL_ARGS}`"}
+
+	poudriere_init() {
 	printf "Verifying jails not already running"
 	for jail in ${POUDRIERE_JAILS}; do
 		if [ "`${POUDRIERE} ${POUDRIERE_STATUS_ARGS} -j $jail | awk '{ print $2 }' | grep -com1 "^${POUDRIERE_PORT}$"`" -eq "1" ]; then
@@ -669,6 +680,12 @@ elif [ "${TEST_BUILD}" -eq "1" ] && [ "${USE_POUDRIERE}" == "YES" ]; then
 		JAIL_VERIFY=$(( ${JAIL_VERIFY} + 1 ))
 	done
 	printf " done\n"
+	}
+	POUDRIERE_SETS=`printf "%s\n" ${POUDRIERE_SETS} | sort -u`
+		for sets in ${POUDRIERE_SETS}; do
+			poudriere_args "$sets"
+			poudriere_init
+		done
 	${TMUX_COMMAND} attach-session -t "${TMUX_SESSION}" >/dev/null 2>&1
 	if [ "$?" -ne 0 ]; then
 		${TMUX_COMMAND} switch -t "${TMUX_SESSION}"
